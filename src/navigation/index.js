@@ -2,6 +2,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Registration from "../screens/Registration";
 import LoginScreen from "../screens/LoginScreen";
+import ProfileScreen from "../screens/ProfileScreen";
 import BottomTabNavigator from "./BottomTabNavigator"; // Теперь ProfileScreen будет с табами
 
 const Stack = createNativeStackNavigator();
