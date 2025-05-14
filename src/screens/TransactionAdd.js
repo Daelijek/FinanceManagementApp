@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useRef } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from '@react-native-picker/picker';
 import {
   StyleSheet,
   Text,
@@ -11,6 +12,8 @@ import {
   ScrollView,
   Platform,
   TextInput,
+  Modal,
+  Pressable,
 } from "react-native";
 
 const TransactionAdd = () => {
@@ -20,11 +23,20 @@ const TransactionAdd = () => {
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
   const inputRef = useRef(null);
+  const [isRecurring, setIsRecurring] = useState(false);
 
   const handlePress = () => {
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  };
+
+  const [selectedMethod, setSelectedMethod] = useState(null); // 'cash' | 'card'
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const handleSelect = (method) => {
+    setSelectedMethod(method);
+    setModalVisible(false);
   };
 
   // Обработчик изменений в DateTimePicker
@@ -85,7 +97,7 @@ const TransactionAdd = () => {
             <Text
               style={[
                 styles.switchText,
-                selectedType === "expense" && styles.selectedText,
+                { color: selectedType === "expense" ? "#FFFFFF" : "#374151" },
               ]}
             >
               Expense
@@ -101,7 +113,7 @@ const TransactionAdd = () => {
             <Text
               style={[
                 styles.switchText,
-                selectedType === "income" && styles.selectedText,
+                { color: selectedType === "income" ? "#FFFFFF" : "#374151" },
               ]}
             >
               Income
@@ -132,7 +144,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "shopping" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -187,7 +199,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "transport" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -244,7 +256,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "healthCare" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -273,7 +285,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "entertainment" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -304,7 +316,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "travel" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -333,7 +345,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "subscription" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -366,7 +378,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "salary" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -395,7 +407,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "investment" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -424,7 +436,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "savings" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <MaterialCommunityIcons
@@ -479,7 +491,7 @@ const TransactionAdd = () => {
                       style={[
                         styles.categoryIcon,
                         selectedCategory === "otherIncome" &&
-                          styles.selectedCategory,
+                        styles.selectedCategory,
                       ]}
                     >
                       <Ionicons
@@ -548,27 +560,95 @@ const TransactionAdd = () => {
                 />
               ))}
           </View>
-          <TouchableOpacity
-            style={styles.transactionNote}
-            onPress={handlePress}
-            activeOpacity={0.3} // Значение меньше 1 для анимации при нажатии
-          >
-            <Ionicons name="document-text-outline" size={24} color="#4B5563" />
-            <View style={styles.noteInputPlaceholder}>
-              <Text style={styles.noteInputLabel}>Note</Text>
-              <TextInput
-                ref={inputRef}
-                placeholder="Add note"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                underlineColorAndroid="transparent"
-                selectionColor="transparent"
-              />
-            </View>
-          </TouchableOpacity>
+          <View style={styles.transactionNote}>
+            <TouchableOpacity
+              style={styles.transactionNoteInner}
+              onPress={handlePress}
+              activeOpacity={0.3} // Значение меньше 1 для анимации при нажатии
+            >
+              <Ionicons name="document-text-outline" size={24} color="#4B5563" />
+              <View style={styles.noteInputPlaceholder}>
+                <Text style={styles.noteInputLabel}>Note</Text>
+                <TextInput
+                  ref={inputRef}
+                  placeholder="Add note"
+                  placeholderTextColor="#9CA3AF"
+                  style={styles.input}
+                  underlineColorAndroid="transparent"
+                  selectionColor="transparent"
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.paymentMethod}>
-            
+            <TouchableOpacity
+              style={styles.paymentMethodInner}
+              onPress={() => setModalVisible(true)}
+              activeOpacity={0.3}
+            >
+              <Ionicons name="card-outline" size={24} color="#4B5563" />
+              <View style={styles.noteInputPlaceholder}>
+                <Text style={styles.noteInputLabel}>Payment Method</Text>
+                <Text style={[styles.noteText, selectedMethod && styles.selectedText]}>
+                  {selectedMethod ? (selectedMethod === 'cash' ? 'Cash' : 'Card') : 'Select...'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <Modal
+              transparent
+              visible={modalVisible}
+              animationType="fade"
+              onRequestClose={() => setModalVisible(false)}
+            >
+              <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+                <View style={styles.modalContainer}>
+                  <Pressable style={styles.modalOption} onPress={() => handleSelect('cash')}>
+                    <Text style={styles.modalText}>Cash</Text>
+                  </Pressable>
+                  <Pressable style={styles.modalOption} onPress={() => handleSelect('card')}>
+                    <Text style={styles.modalText}>Card</Text>
+                  </Pressable>
+                </View>
+              </Pressable>
+            </Modal>
+          </View>
+
+          <View style={styles.recurringTransaction}>
+            <TouchableOpacity
+              style={[
+                styles.recurringTransactionInner,
+                isRecurring && styles.recurringTransactionActive,
+              ]}
+              onPress={() => setIsRecurring(!isRecurring)}
+            >
+              <Ionicons
+                name="repeat"
+                size={24}
+                color={isRecurring ? "#FFFFFF" : "#4B5563"}
+              />
+              <View style={styles.recurringContent}>
+                <Text
+                  style={[
+                    styles.recurringText,
+                    isRecurring && styles.recurringTextActive,
+                  ]}
+                >
+                  Recurring Transaction
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <View>
+            <TouchableOpacity>
+              <Ionicons
+                name="image-outline"
+                size={24}
+                color={isRecurring ? "#FFFFFF" : "#4B5563"}
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -594,6 +674,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 4,
     justifyContent: "space-around",
+    marginBottom: 44,
   },
   switchButton: {
     flex: 1,
@@ -613,12 +694,12 @@ const styles = StyleSheet.create({
     fontWeight: 400,
   },
   selectedText: {
-    color: "#fff",
   },
   balance: {
     alignItems: "center",
     flexDirection: "row",
     margin: "auto",
+    marginBottom: 44,
   },
   balanceValue: {
     color: "#9CA3AF",
@@ -630,10 +711,14 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 600,
   },
+  category: {
+    marginBottom: 20,
+  },
   categoryTitle: {
     fontWeight: 600,
     fontSize: 14,
     color: "#4B5563",
+    marginBottom: 15,
   },
   categoryGroup: {
     flexDirection: "row",
@@ -691,6 +776,14 @@ const styles = StyleSheet.create({
     height: 320,
     width: "100%",
   },
+  transactionDetail: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+  },
+  transactionDate: {
+    marginBottom: 15,
+  },
   dateInputPlaceholder: {
     marginLeft: 12,
   },
@@ -713,6 +806,9 @@ const styles = StyleSheet.create({
     color: "#1F2937",
   },
   transactionNote: {
+    marginBottom: 15,
+  },
+  transactionNoteInner: {
     height: 76,
     flexDirection: "row",
     alignItems: "center",
@@ -741,6 +837,76 @@ const styles = StyleSheet.create({
     height: 19,
     fontSize: 16,
     padding: 0, // чтобы не было отступов внутри
+  },
+  paymentMethod: {
+    marginBottom: 16,
+  },
+  paymentMethodInner: {
+    height: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: "#F9FAFB",
+  },
+  noteInputPlaceholder: {
+    marginLeft: 12,
+  },
+  noteInputLabel: {
+    fontSize: 14,
+    color: "#4B5563",
+    marginBottom: 4,
+    fontWeight: "400",
+  },
+  noteText: {
+    fontSize: 16,
+    color: "#9CA3AF", // placeholder-style серый
+  },
+  selectedText: {
+    color: "#1F2937", // текст при выборе (темнее)
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  modalContainer: {
+    marginHorizontal: 40,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalOption: {
+    paddingVertical: 12,
+  },
+  modalText: {
+    fontSize: 16,
+    color: "#1F2937",
+  },
+  recurringTransaction: {
+    marginBottom: 15
+  },
+  recurringTransactionInner: {
+    height: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: "#F9FAFB",
+  },
+  recurringTransactionActive: {
+    backgroundColor: "#007AFF", // Синий фон при выборе
+  },
+  recurringContent: {
+    marginLeft: 12,
+  },
+  recurringText: {
+    fontSize: 16,
+    color: "#4B5563",
+  },
+  recurringTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "500",
   },
 });
 
