@@ -97,4 +97,3 @@ async def reset_password(
         db
     )
     return {"message": "Password successfully reset"}
-
