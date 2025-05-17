@@ -1,4 +1,4 @@
-import React, { useContext, version } from "react";
+import React, { useContext, useState } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,13 +6,75 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Image,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
 
+const API_URL = "https://c1fa-85-159-27-203.ngrok-free.app";
+
 const LoginScreen = ({ navigation }) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      return Alert.alert("Ошибка", "Пожалуйста, заполните все поля.");
+    }
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/v1/auth/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+
+      // Всегда читаем как текст, чтобы не упасть на синтаксисе
+      const rawBody = await response.text();
+      console.log("HTTP", response.status, "raw body:", rawBody);
+
+      // Пытаемся разобрать JSON, но не падаем
+      let data = null;
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        // если не JSON — оставляем data = null
+      }
+
+      if (response.ok) {
+        // Успешный вход
+        console.log("Login successful:", data);
+        // TODO: сохраняем токены из data.access_token и data.refresh_token
+        return navigation.navigate("Profile");
+      }
+
+      // Ошибочный статус: HTTP 4xx или 5xx
+      let message = "";
+
+      if (data && data.detail) {
+        // detail может быть строкой или массивом
+        if (Array.isArray(data.detail)) {
+          message = data.detail.map((e) => e.msg).join("\n");
+        } else {
+          message = data.detail;
+        }
+      } else {
+        // не JSON или неожиданное поле — показываем чистый текст
+        message = rawBody || "Неизвестная ошибка при входе.";
+      }
+
+      Alert.alert("Ошибка входа", message);
+    } catch (networkError) {
+      console.error("Network error during login:", networkError);
+      Alert.alert("Ошибка сети", "Не удалось подключиться к серверу.");
+    }
+  };
+
   const pressedButton = () => navigation.navigate("Profile");
   const handleForgotPass = () => console.log("Forgot password pressed");
   const handleSignUp = () => navigation.navigate("Registration");
@@ -46,6 +108,8 @@ const LoginScreen = ({ navigation }) => {
                 placeholder="Enter your email"
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
+                value={email}
+                onChangeText={setEmail}
                 aria-labelledby="labelEmail"
                 left={<TextInput.Icon icon="email-outline" color="gray" />}
                 theme={{
@@ -68,6 +132,8 @@ const LoginScreen = ({ navigation }) => {
                 placeholder="Create password"
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
+                value={password}
+                onChangeText={setPassword}
                 aria-labelledby="labelPassword"
                 left={<TextInput.Icon icon="lock-outline" color="gray" />}
                 theme={{
@@ -87,7 +153,7 @@ const LoginScreen = ({ navigation }) => {
           </View>
 
           {/*Create Account Button*/}
-          <TouchableOpacity onPress={pressedButton} style={styles.shadow}>
+          <TouchableOpacity onPress={handleLogin} style={styles.shadow}>
             <LinearGradient
               colors={["#2563EB", "#2563EB"]}
               style={styles.button}
