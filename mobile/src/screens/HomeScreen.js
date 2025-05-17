@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext, version } from "react";
 import {
   StyleSheet,
   Text,
@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { BarChart } from "react-native-chart-kit";
+import { ThemeContext } from "../context/ThemeContext";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -40,6 +41,10 @@ const HomeScreen = ({ navigation }) => {
       },
     ],
   };
+
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === "dark";
+  const styles = getThemedStyles(isDark);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -265,225 +270,225 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  header: {
-    height: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    position: "static",
-    marginBottom: 24,
-  },
-  headerGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  headerImg: {
-    width: 32,
-    height: 32,
-    borderRadius: 100,
-  },
-  headerText: {
-    fontWeight: 500,
-    fontSize: 14,
-    color: "#000",
-    marginLeft: 12,
-  },
-  totalBalance: {
-    paddingHorizontal: 20,
-  },
-  balanceCardGradient: {
-    borderRadius: 16,
-  },
-  balanceCard: {
-    height: 144,
-    width: "100%",
-    margin: "auto",
-    padding: 24,
-    justifyContent: "space-around",
-  },
-  balanceTitle: {
-    fontWeight: 500,
-    fontSize: 14,
-    color: "#fff",
-  },
-  balanceAmount: {
-    fontWeight: 700,
-    fontSize: 30,
-    color: "#fff",
-  },
-  balanceGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  balanceReport: {
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#fff",
-    zIndex: 1,
-  },
-  reportbkg: {
-    backgroundColor: "#FFFFFF33",
-    borderRadius: 100,
-    padding: 4,
-  },
-  balanceReportText: {
-    color: "#fff",
-    fontWeight: 500,
-    fontSize: 14,
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    justifyContent: "space-around",
-  },
-  actionCard: {
-    width: 75,
-    height: 68,
-    alignItems: "center",
-    justifyContent: "space-around",
-    backgroundColor: "#fff",
-    borderRadius: 12,
-  },
-  actionText: {
-    color: "#4B5563",
-    fontWeight: 500,
-    fontSize: 12,
-  },
-  recentTransactions: {
-    padding: 20,
-    backgroundColor: "#fff",
-    marginBottom: 24,
-  },
-  recentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 17,
-  },
-  recentTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-  },
-  recentAll: {
-    color: "#2563EB",
-    fontSize: 14,
-    fontWeight: 500,
-  },
-  expenseCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 17,
-  },
-  recentCardGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  expenseIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 100,
-    padding: 10,
-    marginRight: 12,
-  },
-  expenseText: {
-    fontWeight: 500,
-    fontSize: 16,
-    color: "#000",
-  },
-  expenseDate: {
-    fontWeight: 500,
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  expenseInfo: {
-    fontWeight: 600,
-    fontSize: 16,
-    color: "#000",
-  },
-  incomeCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  incomeIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: "#DCFCE7",
-    borderRadius: 100,
-    padding: 10,
-    marginRight: 12,
-  },
-  incomeText: {
-    fontWeight: 500,
-    fontSize: 16,
-    color: "#000",
-  },
-  incomeDate: {
-    fontWeight: 500,
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  incomeInfo: {
-    fontWeight: 600,
-    fontSize: 16,
-    color: "#16A34A",
-  },
-  budgetOverview: {
-    backgroundColor: "#fff",
-    padding: 20,
-    height: 270,
-    marginBottom: 24,
-  },
-  budgetOverviewText: {
-    fontWeight: 600,
-    fontSize: 16,
-    color: "#000",
-  },
-  budgetList: {
-    flex: 1,
-    justifyContent: "space-around",
-    marginTop: 16,
-  },
-  budgetItemHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  budgetCategory: {
-    fontWeight: 500,
-    fontSize: 14,
-  },
-  budgetAmount: {
-    fontWeight: 500,
-    fontSize: 14,
-  },
-  monthlyExpenses: {
-    backgroundColor: "#fff",
-    padding: 20,
-    height: 280,
-    marginBottom: 24,
-  },
-  monthlyExpensesText: {
-    fontWeight: 600,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  expensesHeader: {
-    marginBottom: 12,
-  },
-  monthlyExpensesText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111",
-  },
-});
+const getThemedStyles = (isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+    },
+    header: {
+      height: 64,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      position: "static",
+      marginBottom: 24,
+    },
+    headerGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    headerImg: {
+      width: 32,
+      height: 32,
+      borderRadius: 100,
+    },
+    headerText: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#F9FAFB" : "#000",
+      marginLeft: 12,
+    },
+    totalBalance: {
+      paddingHorizontal: 20,
+    },
+    balanceCardGradient: {
+      borderRadius: 16,
+    },
+    balanceCard: {
+      height: 144,
+      width: "100%",
+      margin: "auto",
+      padding: 24,
+      justifyContent: "space-around",
+    },
+    balanceTitle: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: "#FFFFFF",
+    },
+    balanceAmount: {
+      fontWeight: "700",
+      fontSize: 30,
+      color: "#FFFFFF",
+    },
+    balanceGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    balanceReport: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: "#FFFFFF",
+      zIndex: 1,
+    },
+    reportbkg: {
+      backgroundColor: "#FFFFFF33",
+      borderRadius: 100,
+      padding: 4,
+    },
+    balanceReportText: {
+      color: "#FFFFFF",
+      fontWeight: "500",
+      fontSize: 14,
+    },
+    actions: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 24,
+      justifyContent: "space-around",
+    },
+    actionCard: {
+      width: 75,
+      height: 68,
+      alignItems: "center",
+      justifyContent: "space-around",
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 12,
+    },
+    actionText: {
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      fontWeight: "500",
+      fontSize: 12,
+    },
+    recentTransactions: {
+      padding: 20,
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      marginBottom: 24,
+    },
+    recentHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 17,
+    },
+    recentTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: isDark ? "#FFFFFF" : "#000",
+    },
+    recentAll: {
+      color: "#2563EB",
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    expenseCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 17,
+    },
+    recentCardGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    expenseIcon: {
+      width: 40,
+      height: 40,
+      backgroundColor: isDark ? "#374151" : "#F3F4F6",
+      borderRadius: 100,
+      padding: 10,
+      marginRight: 12,
+    },
+    expenseText: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#000",
+    },
+    expenseDate: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    expenseInfo: {
+      fontWeight: "600",
+      fontSize: 16,
+      color: isDark ? "#FFFFFF" : "#000",
+    },
+    incomeCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    incomeIcon: {
+      width: 40,
+      height: 40,
+      backgroundColor: "#DCFCE7",
+      borderRadius: 100,
+      padding: 10,
+      marginRight: 12,
+    },
+    incomeText: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#000",
+    },
+    incomeDate: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    incomeInfo: {
+      fontWeight: "600",
+      fontSize: 16,
+      color: "#16A34A",
+    },
+    budgetOverview: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      padding: 20,
+      height: 270,
+      marginBottom: 24,
+    },
+    budgetOverviewText: {
+      fontWeight: "600",
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#000",
+    },
+    budgetList: {
+      flex: 1,
+      justifyContent: "space-around",
+      marginTop: 16,
+    },
+    budgetItemHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    budgetCategory: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#D1D5DB" : "#000",
+    },
+    budgetAmount: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#D1D5DB" : "#000",
+    },
+    monthlyExpenses: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      padding: 20,
+      height: 280,
+      marginBottom: 24,
+    },
+    monthlyExpensesText: {
+      fontWeight: "600",
+      fontSize: 16,
+      marginBottom: 20,
+      color: isDark ? "#F3F4F6" : "#111",
+    },
+    expensesHeader: {
+      marginBottom: 12,
+    },
+  });
 
 export default HomeScreen;
