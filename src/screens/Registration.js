@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext, version } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,12 +10,17 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { ThemeContext } from "../context/ThemeContext";
 
 const Registration = ({ navigation }) => {
   const pressedButton = () => navigation.navigate("Login");
   const handleGoogleLogin = () => console.log("Google login pressed");
   const handleAppleLogin = () => console.log("Apple login pressed");
-  const handlePrivacyPolicy = () => console.log("Privacy Policy pressed");
+  const handlePrivacyPolicy = () => navigation.navigate("PrivacyPolicy");
+
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === "dark";
+  const styles = getThemedStyles(isDark);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -210,158 +215,170 @@ const Registration = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    justifyContent: "space-between",
-  },
-  content: {
-    paddingTop: 70,
-  },
-  title: {
-    textAlign: "center",
-    fontWeight: 600,
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  titleLable: {
-    fontWeight: 500,
-    fontSize: 16,
-    textAlign: "center",
-    color: "#4B5563",
-    marginBottom: 32,
-  },
-  formArea: {
-    width: "100%",
-    alignItems: "center", // Center the input
-    marginBottom: 16,
-  },
-  inputContainer: {
-    width: "80%", // Sets width for the input container
-  },
-  label: {
-    textAlign: "left",
-    marginBottom: 8,
-    fontSize: 14,
-    fontWeight: "500", // Fix fontWeight issue
-    color: "#374151",
-  },
-  input: {
-    backgroundColor: "#f9fafb", // Keeps custom background color
-    width: "100%",
-    height: 50,
-    fontSize: 16,
-  },
-  button: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    width: "80%",
-  },
-  buttonTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  shadow: {
-    width: "100%",
-    alignItems: "center",
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 10 }, // Смещение тени
-    shadowOpacity: 0.3, // Прозрачность тени
-    shadowRadius: 15, // Размытие тени
-    elevation: 6, // Тень для Android
-  },
-  secondContent: {
-    height: "30%",
-  },
-  secondContainer: {
-    width: "80%",
-    margin: "auto",
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  socialGroup: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  social: {
-    width: 150,
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-  },
-  contentGroup: {
-    flexDirection: "row",
-    margin: "auto",
-    alignItems: "center",
-  },
-  socialText: {
-    fontWeight: 500,
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  socialImg: {
-    width: 20,
-    height: 20,
-  },
-  security: {
-    width: "100%",
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    height: 50,
-    alignItems: "center",
-  },
-  securityGroup: {
-    alignItems: "center",
-    flexDirection: "row",
-    margin: "auto",
-  },
-  securityImg: {
-    width: 20,
-    height: 20,
-  },
-  securityText: {
-    color: "#4B5563",
-    fontWeight: 500,
-    fontSize: 14,
-    textAlign: "center",
-    marginLeft: 5,
-  },
-  signIn: {},
-  signInGroup: {
-    alignItems: "center",
-    margin: "auto",
-    flexDirection: "row",
-  },
-  signInText: {
-    fontWeight: 500,
-    fontSize: 16,
-    textAlign: "center",
-    color: "#4B5563",
-  },
-  signInButton: {
-    color: "#2563EB",
-    fontWeight: 500,
-    fontSize: 16,
-  },
-  policy: {},
-  policyGroup: {
-    alignItems: "center",
-  },
-  policyText: {
-    color: "#6B7280",
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  policyButton: {
-    color: "#2563EB",
-    fontSize: 12,
-    fontWeight: 500,
-  },
-});
+const getThemedStyles = (isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+      justifyContent: "space-between",
+    },
+    content: {
+      paddingTop: 70,
+    },
+    title: {
+      textAlign: "center",
+      fontWeight: "600",
+      fontSize: 24,
+      marginBottom: 8,
+      color: isDark ? "#FFFFFF" : "#000000",
+    },
+    titleLable: {
+      fontWeight: "500",
+      fontSize: 16,
+      textAlign: "center",
+      color: isDark ? "#9CA3AF" : "#4B5563",
+      marginBottom: 32,
+    },
+    formArea: {
+      width: "100%",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    inputContainer: {
+      width: "80%",
+    },
+    label: {
+      textAlign: "left",
+      marginBottom: 8,
+      fontSize: 14,
+      fontWeight: "500",
+      color: isDark ? "#E5E7EB" : "#374151",
+    },
+    input: {
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+      color: isDark ? "#F9FAFB" : "#000000",
+      width: "100%",
+      height: 50,
+      fontSize: 16,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+    },
+    button: {
+      paddingVertical: 15,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      alignItems: "center",
+      width: "80%",
+      backgroundColor: "#2563EB",
+    },
+    buttonTitle: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontWeight: "bold",
+    },
+    shadow: {
+      width: "100%",
+      alignItems: "center",
+      shadowColor: "#3B82F6",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 15,
+      elevation: 6,
+    },
+    secondContent: {
+      height: "30%",
+    },
+    secondContainer: {
+      width: "80%",
+      margin: "auto",
+      flex: 1,
+      justifyContent: "space-between",
+    },
+    socialGroup: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    social: {
+      width: 150,
+      height: 50,
+      borderWidth: 1,
+      borderColor: isDark ? "#334155" : "#E5E7EB",
+      borderRadius: 12,
+      backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+    },
+    contentGroup: {
+      flexDirection: "row",
+      margin: "auto",
+      alignItems: "center",
+    },
+    socialText: {
+      fontWeight: "500",
+      fontSize: 16,
+      marginLeft: 8,
+      color: isDark ? "#F9FAFB" : "#000000",
+    },
+    socialImg: {
+      width: 20,
+      height: 20,
+    },
+    security: {
+      width: "100%",
+      backgroundColor: isDark ? "#1E40AF" : "#EFF6FF",
+      borderRadius: 12,
+      height: 50,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    securityGroup: {
+      alignItems: "center",
+      flexDirection: "row",
+      margin: "auto",
+    },
+    securityImg: {
+      width: 20,
+      height: 20,
+    },
+    securityText: {
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      fontWeight: "500",
+      fontSize: 14,
+      textAlign: "center",
+      marginLeft: 5,
+    },
+    signIn: {},
+    signInGroup: {
+      alignItems: "center",
+      margin: "auto",
+      flexDirection: "row",
+    },
+    signInText: {
+      fontWeight: "500",
+      fontSize: 16,
+      textAlign: "center",
+      color: isDark ? "#9CA3AF" : "#4B5563",
+    },
+    signInButton: {
+      color: "#2563EB",
+      fontWeight: "500",
+      fontSize: 16,
+    },
+    policy: {},
+    policyGroup: {
+      alignItems: "center",
+    },
+    policyText: {
+      color: isDark ? "#6B7280" : "#6B7280",
+      fontSize: 12,
+      fontWeight: "500",
+    },
+    policyButton: {
+      color: "#2563EB",
+      fontSize: 12,
+      fontWeight: "500",
+    },
+  });
 
 export default Registration;
