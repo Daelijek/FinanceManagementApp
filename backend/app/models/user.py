@@ -1,6 +1,7 @@
 # app/models/user.py
 from sqlalchemy import Column, String, Boolean, DateTime, Integer
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -25,3 +26,6 @@ class User(Base):
     # Токен для сброса пароля
     reset_password_token = Column(String, nullable=True)
     reset_password_token_expires = Column(DateTime(timezone=True), nullable=True)
+
+    # Связи с другими моделями
+    profile = relationship("UserProfile", back_populates="user", uselist=False)

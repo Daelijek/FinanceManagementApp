@@ -8,6 +8,10 @@ from app.schemas.auth import Token, OAuthLoginRequest
 from app.schemas.user import UserCreate, UserOAuthCreate
 from app.utils.security import SecurityUtils
 from app.config import settings
+from app.services.profile import ProfileService
+from app.schemas.profile import ProfileCreate, FinancialDataCreate
+from app.models.financial import SubscriptionTypeEnum
+from datetime import datetime, timedelta
 import httpx
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
@@ -45,6 +49,23 @@ class AuthService:
         db.commit()
         db.refresh(user)
 
+        # Создаем профиль с бесплатной подпиской
+        profile_data = ProfileCreate()
+        profile = await ProfileService.create_profile(user.id, profile_data, db)
+
+        # Устанавливаем тип подписки и срок действия
+        expires_at = datetime.utcnow() + timedelta(days=365)  # Бесплатно на год
+        await ProfileService.update_subscription(user.id, SubscriptionTypeEnum.FREE, expires_at, db)
+
+        # Создаем начальные финансовые данные
+        financial_data = FinancialDataCreate(
+            balance=0.0,
+            savings=0.0,
+            credit_score=0
+        )
+        await ProfileService.create_financial_data(profile.id, financial_data, db)
+
+        # Возвращаем пользователя
         return user
 
     @staticmethod
