@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useContext } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from '@react-native-picker/picker';
@@ -15,6 +15,7 @@ import {
   Modal,
   Pressable,
 } from "react-native";
+import { ThemeContext } from "../context/ThemeContext";
 
 const TransactionAdd = () => {
   const [selectedType, setSelectedType] = useState("expense");
@@ -83,6 +84,16 @@ const TransactionAdd = () => {
     return isToday ? `Today, ${formattedDate}` : formattedDate;
   };
 
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === "dark";
+  const styles = getThemedStyles(isDark);
+
+  const textColor = isDark ? "#F9FAFB" : "#1F2937";
+  const subTextColor = isDark ? "#9CA3AF" : "#4B5563";
+  const placeholderColor = isDark ? "#6B7280" : "#9CA3AF";
+  const iconColor = isDark ? "#D1D5DB" : "#4B5563";
+  const switchInactiveColor = isDark ? "#1F2937" : "#F3F4F6";
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -103,7 +114,7 @@ const TransactionAdd = () => {
               <Text
                 style={[
                   styles.switchText,
-                  { color: selectedType === "expense" ? "#FFFFFF" : "#374151" },
+                  { color: selectedType === "expense" ? "#FFFFFF" : textColor },
                 ]}
               >
                 Expense
@@ -119,7 +130,7 @@ const TransactionAdd = () => {
               <Text
                 style={[
                   styles.switchText,
-                  { color: selectedType === "income" ? "#FFFFFF" : "#374151" },
+                  { color: selectedType === "income" ? "#FFFFFF" : textColor },
                 ]}
               >
                 Income
@@ -653,9 +664,10 @@ const TransactionAdd = () => {
                 <Ionicons
                   name="image-outline"
                   size={24}
+                  color="#4B5563"
                 />
                 <View style={styles.receipteContent}>
-                  <Text>Add Receipt Photo</Text>
+                  <Text style={styles.receipteText}>Add Receipt Photo</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -676,287 +688,274 @@ const TransactionAdd = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  content: {
-    padding: 20,
-  },
-  switch: {
-    width: "100%",
-    height: 60,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    flexDirection: "row",
-    margin: "auto",
-    borderRadius: 12,
-    padding: 4,
-    justifyContent: "space-around",
-    marginBottom: 44,
-  },
-  switchButton: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-    borderRadius: 8,
-  },
-  selectedButton: {
-    backgroundColor: "#007AFF",
-  },
-  switchText: {
-    textAlign: "center",
-    margin: "auto",
-    alignItems: "center",
-    color: "#4B5563",
-    fontSize: 16,
-    fontWeight: 400,
-  },
-  selectedText: {
-  },
-  balance: {
-    alignItems: "center",
-    flexDirection: "row",
-    margin: "auto",
-    marginBottom: 44,
-  },
-  balanceValue: {
-    color: "#9CA3AF",
-    fontSize: 36,
-    fontWeight: 600,
-  },
-  balanceAmount: {
-    color: "#000",
-    fontSize: 36,
-    fontWeight: 600,
-  },
-  category: {
-    marginBottom: 30,
-  },
-  categoryTitle: {
-    fontWeight: 600,
-    fontSize: 14,
-    color: "#4B5563",
-    marginBottom: 15,
-  },
-  categoryGroup: {
-    flexDirection: "row",
-  },
-  categoryCard: {
-    marginRight: 16,
-  },
-  categoryIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    padding: 20,
-  },
-  selectedCategory: {
-    backgroundColor: "#007AFF",
-  },
-  categoryText: {
-    color: "#4B5563",
-    fontWeight: 400,
-    fontSize: 12,
-    textAlign: "center",
-    maxWidth: 70,
-  },
-  iosPickerContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    overflow: "hidden",
-    marginTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  iosPickerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 16,
-    backgroundColor: "#f8f8f8",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e5e5",
-  },
-  confirmButton: {
-    color: "#007AFF",
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  cancelButton: {
-    color: "#FF3B30",
-    fontSize: 17,
-  },
-  iosPicker: {
-    height: 320,
-    width: "100%",
-  },
-  transactionDetails: {
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  transactionDate: {
-    marginBottom: 15,
-  },
-  dateInputPlaceholder: {
-    marginLeft: 12,
-  },
-  dateInput: {
-    height: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#F9FAFB",
-  },
-  dateInputLabel: {
-    fontSize: 14,
-    color: "#4B5563", // Серый текст (Tailwind Gray-400)
-    marginBottom: 4,
-    fontWeight: "400",
-  },
-  dateText: {
-    fontSize: 16,
-    color: "#1F2937",
-  },
-  transactionNote: {
-    marginBottom: 15,
-  },
-  transactionNoteInner: {
-    height: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#F9FAFB",
-  },
-  noteInputPlaceholder: {
-    marginLeft: 12,
-  },
-  noteInputLabel: {
-    fontSize: 14,
-    color: "#4B5563", // Серый текст (Tailwind Gray-400)
-    marginBottom: 4,
-    fontWeight: "400",
-  },
-  noteText: {
-    fontSize: 16,
-    color: "#9CA3AF",
-  },
-  input: {
-    // убираем все границы у TextInput
-    borderWidth: 0,
-    backgroundColor: "#F9FAFB",
-    width: "100%",
-    height: 19,
-    fontSize: 16,
-    padding: 0, // чтобы не было отступов внутри
-  },
-  paymentMethod: {
-    marginBottom: 16,
-  },
-  paymentMethodInner: {
-    height: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#F9FAFB",
-  },
-  noteInputPlaceholder: {
-    marginLeft: 12,
-  },
-  noteInputLabel: {
-    fontSize: 14,
-    color: "#4B5563",
-    marginBottom: 4,
-    fontWeight: "400",
-  },
-  noteText: {
-    fontSize: 16,
-    color: "#9CA3AF", // placeholder-style серый
-  },
-  selectedText: {
-    color: "#1F2937", // текст при выборе (темнее)
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
-  },
-  modalContainer: {
-    marginHorizontal: 40,
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalOption: {
-    paddingVertical: 12,
-  },
-  modalText: {
-    fontSize: 16,
-    color: "#1F2937",
-  },
-  recurringTransaction: {
-    marginBottom: 15
-  },
-  recurringTransactionInner: {
-    height: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#F9FAFB",
-  },
-  recurringTransactionActive: {
-    backgroundColor: "#007AFF", // Синий фон при выборе
-  },
-  recurringContent: {
-    marginLeft: 12,
-  },
-  recurringText: {
-    fontSize: 16,
-    color: "#4B5563",
-  },
-  recurringTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "500",
-  },
-  receiptePhoto: {
-    marginBottom: 15
-  },
-  receiptePhotoInner: {
-    height: 76,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 12,
-    padding: 16,
-    backgroundColor: "#F9FAFB",
-  },
-  receipteContent: {
-    marginLeft: 12,
-  },
-  saveTransaction: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-  },
-  saveTransactionInner: {
-    height: 56,
-    justifyContent: 'center', // центрирует по вертикали
-    alignItems: 'center',     // центрирует по горизонтали
-  },
-  saveTransactionText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 16,
-  },
-});
+const getThemedStyles = (isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+    },
+    content: {
+      padding: 20,
+    },
+    switch: {
+      width: "100%",
+      height: 60,
+      backgroundColor: isDark ? "#1F2937" : "#F3F4F6",
+      alignItems: "center",
+      flexDirection: "row",
+      margin: "auto",
+      borderRadius: 12,
+      padding: 4,
+      justifyContent: "space-around",
+      marginBottom: 44,
+    },
+    switchButton: {
+      flex: 1,
+      width: "100%",
+      height: "100%",
+      borderRadius: 8,
+    },
+    selectedButton: {
+      backgroundColor: "#007AFF",
+    },
+    switchText: {
+      textAlign: "center",
+      margin: "auto",
+      alignItems: "center",
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      fontSize: 16,
+      fontWeight: "400",
+    },
+    selectedText: {},
+    balance: {
+      alignItems: "center",
+      flexDirection: "row",
+      margin: "auto",
+      marginBottom: 44,
+    },
+    balanceValue: {
+      color: "#9CA3AF",
+      fontSize: 36,
+      fontWeight: "600",
+    },
+    balanceAmount: {
+      color: isDark ? "#FFFFFF" : "#000000",
+      fontSize: 36,
+      fontWeight: "600",
+    },
+    category: {
+      marginBottom: 30,
+    },
+    categoryTitle: {
+      fontWeight: "600",
+      fontSize: 14,
+      color: isDark ? "#E5E7EB" : "#4B5563",
+      marginBottom: 15,
+    },
+    categoryGroup: {
+      flexDirection: "row",
+    },
+    categoryCard: {
+      marginRight: 16,
+    },
+    categoryIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F3F4F6",
+      alignItems: "center",
+      padding: 20,
+    },
+    selectedCategory: {
+      backgroundColor: "#007AFF",
+    },
+    categoryText: {
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      fontWeight: "400",
+      fontSize: 12,
+      textAlign: "center",
+      maxWidth: 70,
+    },
+    iosPickerContainer: {
+      backgroundColor: isDark ? "#374151" : "#FFFFFF",
+      borderRadius: 10,
+      overflow: "hidden",
+      marginTop: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    iosPickerHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 16,
+      backgroundColor: isDark ? "#374151" : "#F8F8F8",
+      borderBottomWidth: 1,
+      borderBottomColor: "#E5E5E5",
+    },
+    confirmButton: {
+      color: "#007AFF",
+      fontSize: 17,
+      fontWeight: "600",
+    },
+    cancelButton: {
+      color: "#FF3B30",
+      fontSize: 17,
+    },
+    iosPicker: {
+      height: 320,
+      width: "100%",
+    },
+    transactionDetails: {
+      flexDirection: "column",
+      justifyContent: "space-between",
+      marginBottom: 30,
+    },
+    transactionDate: {
+      marginBottom: 15,
+    },
+    dateInputPlaceholder: {
+      marginLeft: 12,
+    },
+    dateInput: {
+      height: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 12,
+      padding: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+    },
+    dateInputLabel: {
+      fontSize: 14,
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      marginBottom: 4,
+      fontWeight: "400",
+    },
+    dateText: {
+      fontSize: 16,
+      color: isDark ? "#F9FAFB" : "#1F2937",
+    },
+    transactionNote: {
+      marginBottom: 15,
+    },
+    transactionNoteInner: {
+      height: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 12,
+      padding: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+    },
+    noteInputPlaceholder: {
+      marginLeft: 12,
+    },
+    noteInputLabel: {
+      fontSize: 14,
+      color: isDark ? "#D1D5DB" : "#4B5563",
+      marginBottom: 4,
+      fontWeight: "400",
+    },
+    noteText: {
+      fontSize: 16,
+      color: isDark ? "#9CA3AF" : "#9CA3AF",
+    },
+    input: {
+      borderWidth: 0,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+      color: isDark ? "#FFFFFF" : "#000000",
+      width: "100%",
+      height: 19,
+      fontSize: 16,
+      padding: 0,
+    },
+    paymentMethod: {
+      marginBottom: 16,
+    },
+    paymentMethodInner: {
+      height: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 12,
+      padding: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.4)",
+    },
+    modalContainer: {
+      marginHorizontal: 40,
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 12,
+      padding: 16,
+    },
+    modalOption: {
+      paddingVertical: 12,
+    },
+    modalText: {
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#1F2937",
+    },
+    recurringTransaction: {
+      marginBottom: 15,
+    },
+    recurringTransactionInner: {
+      height: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 12,
+      padding: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+    },
+    recurringTransactionActive: {
+      backgroundColor: "#007AFF",
+    },
+    recurringContent: {
+      marginLeft: 12,
+    },
+    recurringText: {
+      fontSize: 16,
+      color: isDark ? "#E5E7EB" : "#4B5563",
+    },
+    recurringTextActive: {
+      color: "#FFFFFF",
+      fontWeight: "500",
+    },
+    receiptePhoto: {
+      marginBottom: 15,
+    },
+    receiptePhotoInner: {
+      height: 76,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 12,
+      padding: 16,
+      backgroundColor: isDark ? "#1F2937" : "#F9FAFB",
+    },
+    receipteContent: {
+      marginLeft: 12,
+    },
+    receipteText: {
+      fontSize: 16,
+      color: isDark ? "#E5E7EB" : "#4B5563",
+    },
+    saveTransaction: {
+      backgroundColor: "#007AFF",
+      borderRadius: 12,
+    },
+    saveTransactionInner: {
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    saveTransactionText: {
+      color: "#FFFFFF",
+      fontWeight: "500",
+      fontSize: 16,
+    },
+  });
 
 export default TransactionAdd;

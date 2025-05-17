@@ -1,4 +1,4 @@
-import React, { version } from "react";
+import React, { useContext, version } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,8 +10,16 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { ThemeContext } from "../context/ThemeContext";
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
+  const onPrivacyPolicy = () => navigation.navigate("PrivacyPolicy")
+  const onAppSettings = () => navigation.navigate("AppSettings")
+
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === "dark";
+  const styles = getThemedStyles(isDark);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
@@ -167,7 +175,7 @@ const ProfileScreen = () => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.preferencesItem}>
+            <TouchableOpacity style={styles.preferencesItem} onPress={onAppSettings}>
               <View style={styles.itemGroup}>
                 <Ionicons name="settings-outline" size={24} color="#3B82F6" />
                 <Text style={styles.settingText}>App Settings</Text>
@@ -220,7 +228,7 @@ const ProfileScreen = () => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.preferencesItem}>
+            <TouchableOpacity style={styles.preferencesItem} onPress={onPrivacyPolicy}>
               <View style={styles.itemGroup}>
                 <Ionicons name="shield-outline" size={24} color="#3B82F6" />
                 <Text style={styles.settingText}>Privacy Policy</Text>
@@ -259,152 +267,153 @@ const ProfileScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flexGrow: 1, // Дает возможность прокрутки
-  },
-  header: {
-    height: 270,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerImg: {
-    margin: "auto",
-    width: 120,
-    height: 120,
-    borderRadius: "50%",
-    borderWidth: 4,
-    borderColor: "#fff",
-    marginBottom: 16,
-  },
-  headerText: {
-    margin: "auto",
-    fontWeight: 700,
-    fontSize: 20,
-    color: "#fff",
-    marginBottom: 4,
-  },
-  headerLabel: {
-    margin: "auto",
-    fontWeight: 500,
-    fontSize: 16,
-    color: "#DBEAFE",
-    marginBottom: 8,
-  },
-  headerRole: {
-    margin: "auto",
-    fontWeight: 500,
-    fontSize: 14,
-    color: "#fff",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    backgroundColor: "#60A5FA4D",
-    borderRadius: 100,
-  },
-  cardsBkg: {
-    backgroundColor: "#F9FAFB",
-    height: 180,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    paddingHorizontal: 5,
-  },
-  card: {
-    backgroundColor: "#fff",
-    width: "28%",
-    height: "80%",
-    borderRadius: 12,
-    padding: 16,
-    justifyContent: "space-around",
-  },
-  cardImg: {
-    width: 30,
-    height: 24,
-  },
-  cardText: {
-    fontSize: 14,
-    fontWeight: 500,
-    color: "#4B5563",
-    marginTop: 10,
-  },
-  cardInfo: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: "#000",
-  },
-  accountSettings: {
-    backgroundColor: "#fff",
-    padding: 20,
-    flex: 1,
-  },
-  accountSettingsTitle: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 17,
-  },
-  accountSettingsGroup: {
-    alignItems: "center",
-  },
-  settingItem: {
-    width: "95%",
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    height: 57,
-    borderBottomWidth: 1,
-    borderColor: "#F3F4F6",
-    justifyContent: "space-between",
-  },
-  settingBorderlessItem: {
-    width: "95%",
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    height: 57,
-    justifyContent: "space-between",
-  },
-  itemGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  settingText: {
-    marginLeft: 12,
-  },
-  preferences: {
-    backgroundColor: "#fff",
-    padding: 20,
-    flex: 1,
-  },
-  preferencesTitle: {
-    color: "#000",
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 17,
-  },
-  preferencesGroup: {
-    alignItems: "center",
-  },
-  preferencesItem: {
-    width: "95%",
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    height: 57,
-    borderBottomWidth: 1,
-    borderColor: "#F3F4F6",
-    justifyContent: "space-between",
-  },
-  version: {
-    marginTop: 50,
-    margin: "auto",
-  },
-  versionTitle: {
-    color: "#6B7280",
-  },
-});
+const getThemedStyles = (isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? "#0F172A" : "#FFFFFF",
+    },
+    scrollContainer: {
+      flexGrow: 1,
+    },
+    header: {
+      height: 270,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerImg: {
+      margin: "auto",
+      width: 120,
+      height: 120,
+      borderRadius: "50%",
+      borderWidth: 4,
+      borderColor: "#FFFFFF",
+      marginBottom: 16,
+    },
+    headerText: {
+      margin: "auto",
+      fontWeight: 700,
+      fontSize: 20,
+      color: "#fff",
+      marginBottom: 4,
+    },
+    headerLabel: {
+      margin: "auto",
+      fontWeight: 500,
+      fontSize: 16,
+      color: "#DBEAFE",
+      marginBottom: 8,
+    },
+    headerRole: {
+      margin: "auto",
+      fontWeight: 500,
+      fontSize: 14,
+      color: "#fff",
+      paddingVertical: 4,
+      paddingHorizontal: 8,
+      backgroundColor: "#60A5FA4D",
+      borderRadius: 100,
+    },
+    cardsBkg: {
+      backgroundColor: isDark ? "#1E293B" : "#F9FAFB",
+      height: 180,
+      flexDirection: "row",
+      justifyContent: "space-around",
+      alignItems: "center",
+      paddingHorizontal: 5,
+    },
+    card: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      width: "28%",
+      height: "80%",
+      borderRadius: 12,
+      padding: 16,
+      justifyContent: "space-around",
+    },
+    cardImg: {
+      width: 30,
+      height: 24,
+    },
+    cardText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: isDark ? "#E5E7EB" : "#4B5563",
+      marginTop: 10,
+    },
+    cardInfo: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: isDark ? "#FFFFFF" : "#000000",
+    },
+    accountSettings: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      padding: 20,
+    },
+    accountSettingsTitle: {
+      color: isDark ? "#F3F4F6" : "#000000",
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: 17,
+    },
+    accountSettingsGroup: {
+      alignItems: "center",
+    },
+    settingItem: {
+      width: "95%",
+      paddingHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      height: 57,
+      borderBottomWidth: 1,
+      borderColor: isDark ? "#374151" : "#F3F4F6",
+      justifyContent: "space-between",
+    },
+    settingBorderlessItem: {
+      width: "95%",
+      paddingHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      height: 57,
+      justifyContent: "space-between",
+    },
+    itemGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    settingText: {
+      marginLeft: 12,
+      color: isDark ? "#F9FAFB" : "#000000",
+    },
+    preferences: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      padding: 20,
+    },
+    preferencesTitle: {
+      color: isDark ? "#F3F4F6" : "#000000",
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: 17,
+    },
+    preferencesGroup: {
+      alignItems: "center",
+    },
+    preferencesItem: {
+      width: "95%",
+      paddingHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      height: 57,
+      borderBottomWidth: 1,
+      borderColor: isDark ? "#374151" : "#F3F4F6",
+      justifyContent: "space-between",
+    },
+    version: {
+      marginTop: 50,
+      alignSelf: "center",
+    },
+    versionTitle: {
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+  });
 
 export default ProfileScreen;
