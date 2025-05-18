@@ -13,8 +13,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
 
 const ProfileScreen = ({ navigation }) => {
-  const onPrivacyPolicy = () => navigation.navigate("PrivacyPolicy")
-  const onAppSettings = () => navigation.navigate("AppSettings")
+  const onPrivacyPolicy = () => navigation.navigate("Privacy Policy")
+  const onAppSettings = () => navigation.navigate("App Settings")
+  const onPersonalInformation = () => navigation.navigate("Personal Information")
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
@@ -83,7 +84,7 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.accountSettings}>
           <Text style={styles.accountSettingsTitle}>Account Settings</Text>
           <View style={styles.accountSettingsGroup}>
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity onPress={onPersonalInformation} style={styles.settingItem}>
               <View style={styles.itemGroup}>
                 <Ionicons name="person-outline" size={24} color="#3B82F6" />
                 <Text style={styles.settingText}>Personal Information</Text>

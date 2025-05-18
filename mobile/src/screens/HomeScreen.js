@@ -19,10 +19,12 @@ const screenWidth = Dimensions.get("window").width;
 
 const HomeScreen = ({ navigation }) => {
   const onProfile = () => navigation.navigate("Profile");
-  const onTransactionAdd = () => navigation.navigate("TransactionAdd");
+  const onTransactionAdd = () => navigation.navigate("Transaction Add");
   const onReports = () => navigation.navigate("Reports");
   const onBudget = () => navigation.navigate("Budget");
   const onTransfer = () => navigation.navigate("Transfer");
+  const onNotifications = () => navigation.navigate("Notifications")
+  const onAllTransactions = () => navigation.navigate("All Transactions")
 
   // Sample Budget Data
   const budgetData = [
@@ -66,7 +68,8 @@ const HomeScreen = ({ navigation }) => {
               </TouchableOpacity>
               <Text style={styles.headerText}>Welcome back, Walter</Text>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity
+            onPress={onNotifications}>
               <Ionicons
                 name="notifications-outline"
                 size={24}
@@ -137,7 +140,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.recentTransactions}>
             <View style={styles.recentHeader}>
               <Text style={styles.recentTitle}>Recent Transactions</Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={onAllTransactions}>
                 <Text style={styles.recentAll}>See all</Text>
               </TouchableOpacity>
             </View>

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigation } from "@react-navigation/bottom-tabs";
 
@@ -15,7 +16,11 @@ const TransactionScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.containerInner}>
         <View style={styles.header}>
-          <Text>Welcome to the Transactions Screen</Text>
+          <Text style={styles.headerText}>Transactions</Text>
+          <View style={styles.headerIcons}>
+            <Ionicons name="search-outline" size={24} color={"#4B5563"} />
+            <Ionicons name="filter-outline" size={24} color={"#4B5563"} />
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -25,8 +30,27 @@ const TransactionScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: '#FFFFFF',
+  },
+  containerInner: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: 600,
+    color: '#000',
+  },
+  headerIcons: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 25,
   },
 });
 

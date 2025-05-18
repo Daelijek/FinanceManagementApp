@@ -50,7 +50,7 @@ const LoginScreen = ({ navigation }) => {
         // Успешный вход
         console.log("Login successful:", data);
         // TODO: сохраняем токены из data.access_token и data.refresh_token
-        return navigation.navigate("Profile");
+        return navigation.navigate("MainPage");
       }
 
       // Ошибочный статус: HTTP 4xx или 5xx

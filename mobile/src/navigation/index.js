@@ -1,36 +1,32 @@
+// RootNavigation.js
+
 import React, { useContext } from "react";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+  getFocusedRouteNameFromRoute,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ThemeContext } from "../context/ThemeContext";
 
+// Screens
 import Registration from "../screens/Registration";
 import LoginScreen from "../screens/LoginScreen";
 import TransactionAdd from "../screens/TransactionAdd";
 import PrivacyPolicy from "../screens/PrivacyPolicy";
 import BottomTabNavigator from "./BottomTabNavigator";
 import TransferScreen from "../screens/TransferScreen";
-import CustomHeader from "../components/CustomHeader";
 import AppSettings from "../screens/AppSettings";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import PasswordResetConfirmScreen from "../screens/PasswordResetConfirmScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
+import AllTransactionsScreen from "../screens/AllTransactionsScreen";
+import PersonalInformationScreen from "../screens/PersonalInformationScreen";
 
 const Stack = createNativeStackNavigator();
-
-const CustomBackButton = ({ color }) => {
-  const navigation = useNavigation();
-  return (
-    <TouchableOpacity onPress={() => navigation.goBack()}>
-      <Ionicons
-        name="chevron-back"
-        size={24}
-        color={color}
-        style={{ marginLeft: 15 }}
-      />
-    </TouchableOpacity>
-  );
-};
 
 const AppNavigator = () => {
   const { theme } = useContext(ThemeContext);
@@ -41,7 +37,6 @@ const AppNavigator = () => {
   const headerBorderColor = isDark ? "#374151" : "#F3F4F6";
 
   const defaultHeaderOptions = {
-    headerShown: true,
     headerStyle: {
       backgroundColor: headerBackground,
       borderBottomWidth: 1,
@@ -55,24 +50,94 @@ const AppNavigator = () => {
     headerTintColor: headerTextColor,
   };
 
+  // Универсальная функция для рендеринга «назад» с учётом вложенного таба
+  const makeBackOptions = ({ navigation }) => {
+    const state = navigation.getState();
+    const { routes, index } = state;
+    const prevRoute = routes[index - 1] || {};
+    // сначала берём имя родительского маршрута
+    let previousRouteName = prevRoute.name ?? "Назад";
+    // если у него есть вложенный навигатор — вытаскиваем активный таб
+    if (prevRoute.state) {
+      const nestedIndex = prevRoute.state.index;
+      const nestedRoute = prevRoute.state.routes[nestedIndex];
+      previousRouteName = nestedRoute?.name ?? previousRouteName;
+    }
+
+    return {
+      ...defaultHeaderOptions,
+      headerShown: true,
+      headerLeft: () => (
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", marginRight: 15 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="chevron-back" size={24} color={headerTextColor} />
+          <Text style={{ color: headerTextColor, fontSize: 16 }}>
+            {previousRouteName}
+          </Text>
+        </TouchableOpacity>
+      ),
+    };
+  };
+
   return (
     <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="PasswordResetConfirm" component={PasswordResetConfirmScreen} />
       <Stack.Screen name="Registration" component={Registration} />
-      <Stack.Screen name="Profile" component={BottomTabNavigator} />
-      <Stack.Screen name="TransactionAdd" component={TransactionAdd} options={defaultHeaderOptions} />
-      <Stack.Screen name="Transfer" component={TransferScreen} options={defaultHeaderOptions} />
-      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} options={defaultHeaderOptions} />
-      <Stack.Screen name="AppSettings" component={AppSettings} options={defaultHeaderOptions} />
+
+      {/* Назовём стековый экран «MainPage», чтобы не дублировать имена */}
+      <Stack.Screen name="MainPage" component={BottomTabNavigator} />
+
+      <Stack.Screen
+        name="Transaction Add"
+        component={TransactionAdd}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="Transfer"
+        component={TransferScreen}
+        options={defaultHeaderOptions}
+      />
+
+      <Stack.Screen
+        name="Privacy Policy"
+        component={PrivacyPolicy}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="App Settings"
+        component={AppSettings}
+        options={makeBackOptions}
+      />
+      
+      <Stack.Screen
+        name="All Transactions"
+        component={AllTransactionsScreen}
+        options={makeBackOptions}
+      />
+      
+      <Stack.Screen
+        name="Personal Information"
+        component={PersonalInformationScreen}
+        options={makeBackOptions}
+      />
     </Stack.Navigator>
   );
 };
 
 export default function RootNavigation() {
   const { theme } = useContext(ThemeContext);
-
   return (
     <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
       <AppNavigator />
