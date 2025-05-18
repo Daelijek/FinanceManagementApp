@@ -41,5 +41,27 @@ npx expo start --lan
 
 Снова отсканируйте QR-код в Expo Go на iPhone.
 
+Установка зависимости для отправки email
+
+pip install fastapi-mail
+
 Для запуска бэкенда.
+python -m venv venv
+.\venv\Scripts\activate
+
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+cd C:\Users\Public\Programming\projects\Diploma\FinanceManagementApplication\DaniyarBranch\FinanceManagementApp
+
+<View style={styles.formArea}>
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            {...commonInputProps}
+                            secureTextEntry
+                            placeholder="Password Replay"
+                            value={confirmPassword}
+                            onChangeText={setConfirmPassword}
+                            left={<TextInput.Icon icon="lock-check-outline" color="gray" />}
+                        />
+                    </View>
+</View>

@@ -13,6 +13,8 @@ import BottomTabNavigator from "./BottomTabNavigator";
 import TransferScreen from "../screens/TransferScreen";
 import CustomHeader from "../components/CustomHeader";
 import AppSettings from "../screens/AppSettings";
+import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
+import PasswordResetConfirmScreen from "../screens/PasswordResetConfirmScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -56,6 +58,8 @@ const AppNavigator = () => {
   return (
     <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="PasswordResetConfirm" component={PasswordResetConfirmScreen} />
       <Stack.Screen name="Registration" component={Registration} />
       <Stack.Screen name="Profile" component={BottomTabNavigator} />
       <Stack.Screen name="TransactionAdd" component={TransactionAdd} options={defaultHeaderOptions} />

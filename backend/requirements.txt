@@ -11,4 +11,5 @@ pydantic-settings==2.6.0
 pydantic[email]==2.10.0
 httpx==0.25.2
 google-auth==2.33.0
+fastapi-mail
 python-dotenv==1.0.1

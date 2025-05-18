@@ -1,10 +1,11 @@
 # app/config.py
-from pydantic_settings import BaseSettings
-from typing import Optional
 
+from pydantic_settings import BaseSettings
+from pydantic import EmailStr
+from typing import List, Optional
 
 class Settings(BaseSettings):
-    # Основные настройки
+    # Основные
     PROJECT_NAME: str = "Financial App Backend"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
@@ -19,16 +20,24 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8081",
+    ]
 
-    # Email (для сброса пароля)
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = None
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    EMAILS_FROM_EMAIL: Optional[str] = None
+    # Email (сброс пароля)
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: EmailStr
+    SMTP_PASSWORD: str
+    EMAILS_FROM_EMAIL: EmailStr
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
 
-    # OAuth (Google, Apple)
+    # Время жизни reset-токена (в часах)
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
+
+    # OAuth (Google и Apple)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     APPLE_CLIENT_ID: Optional[str] = None
@@ -37,6 +46,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # игнорировать «лишние» переменные
 
-
+# глобальный экземпляр настроек
 settings = Settings()

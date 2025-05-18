@@ -13,7 +13,7 @@ import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
 
-const API_URL = "https://c1fa-85-159-27-203.ngrok-free.app";
+const API_URL = "https://5771-85-159-27-203.ngrok-free.app";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -76,7 +76,7 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const pressedButton = () => navigation.navigate("Profile");
-  const handleForgotPass = () => console.log("Forgot password pressed");
+  const handleForgotPass = () => navigation.navigate("ForgotPassword");
   const handleSignUp = () => navigation.navigate("Registration");
   const handleGoogleLogin = () => console.log("Google login pressed");
   const handleAppleLogin = () => console.log("Apple login pressed");
@@ -84,6 +84,16 @@ const LoginScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
+
+  const commonInputProps = {
+    mode: "outlined",
+    outlineColor: isDark ? "#374151" : "#E5E7EB",
+    activeOutlineColor: "#2563EB",
+    textColor: isDark ? "#F9FAFB" : "#000000",
+    placeholderTextColor: "#9CA3AF",
+    style: styles.input,
+    theme: { roundness: 12 },
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -104,7 +114,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.formArea}>
             <View style={styles.inputContainer}>
               <TextInput
-                mode="outlined"
+                {...commonInputProps}
                 placeholder="Enter your email"
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
@@ -127,7 +137,7 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.formArea}>
             <View style={styles.inputContainer}>
               <TextInput
-                mode="outlined"
+                {...commonInputProps}
                 secureTextEntry={true}
                 placeholder="Create password"
                 placeholderTextColor="#9CA3AF"
