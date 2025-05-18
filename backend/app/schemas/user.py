@@ -1,6 +1,6 @@
 # app/schemas/user.py
 from pydantic import BaseModel, EmailStr, field_validator
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 
@@ -43,8 +43,29 @@ class UserResponse(UserBase):
 # Схема для обновления пользователя
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+    tax_residence: Optional[str] = None
+
+
+# Схема для персональной информации пользователя
+class UserPersonalInfo(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone_number: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+    tax_residence: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 # Схема для профиля пользователя
 class UserProfile(UserResponse):
     oauth_provider: Optional[str] = None
+    phone_number: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+    tax_residence: Optional[str] = None
