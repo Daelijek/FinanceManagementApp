@@ -1,12 +1,12 @@
 # app/services/transaction.py
-from typing import List, Optional, Dict, Tuple, Union
+from typing import List, Optional, Dict, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from fastapi import HTTPException, status, UploadFile
 from datetime import datetime, date, timedelta
 import calendar
-from app.models.transaction import Transaction, TransactionTypeEnum, PaymentMethodEnum
-from app.models.category import BudgetCategory
+from app.models.transaction import Transaction, PaymentMethodEnum
+from app.models.category import BudgetCategory, CategoryTypeEnum
 from app.schemas.transaction import TransactionCreate, TransactionUpdate, TransactionFilters, TransactionSummary
 import os
 import uuid
@@ -32,22 +32,11 @@ class TransactionService:
                 )
 
             # Проверка соответствия типа транзакции и категории
-            if category.is_income and transaction_data.transaction_type == TransactionTypeEnum.EXPENSE:
+            if category.category_type != transaction_data.transaction_type:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot use income category for expense transaction"
+                    detail=f"Cannot use {category.category_type} category for {transaction_data.transaction_type} transaction"
                 )
-
-            if not category.is_income and transaction_data.transaction_type == TransactionTypeEnum.INCOME:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Cannot use expense category for income transaction"
-                )
-
-        # Проверка банковского счета, если он указан
-        # if transaction_data.bank_account_id:
-        # Здесь нужна проверка принадлежности счета пользователю
-        # ... (реализация)
 
         # Создаем транзакцию
         transaction_dict = model_to_dict(transaction_data)
@@ -94,16 +83,10 @@ class TransactionService:
 
                 # Проверка соответствия типа транзакции и категории
                 transaction_type = transaction_data.transaction_type or transaction.transaction_type
-                if category.is_income and transaction_type == TransactionTypeEnum.EXPENSE:
+                if category.category_type != transaction_type:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Cannot use income category for expense transaction"
-                    )
-
-                if not category.is_income and transaction_type == TransactionTypeEnum.INCOME:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Cannot use expense category for income transaction"
+                        detail=f"Cannot use {category.category_type} category for {transaction_type} transaction"
                     )
 
         # Обновляем только переданные поля
@@ -176,12 +159,12 @@ class TransactionService:
         # Получение итогов для статистики
         total_income = db.query(func.sum(Transaction.amount)).filter(
             Transaction.user_id == user_id,
-            Transaction.transaction_type == TransactionTypeEnum.INCOME
+            Transaction.transaction_type == CategoryTypeEnum.INCOME
         ).scalar() or 0.0
 
         total_expense = db.query(func.sum(Transaction.amount)).filter(
             Transaction.user_id == user_id,
-            Transaction.transaction_type == TransactionTypeEnum.EXPENSE
+            Transaction.transaction_type == CategoryTypeEnum.EXPENSE
         ).scalar() or 0.0
 
         # Применение пагинации
@@ -204,7 +187,6 @@ class TransactionService:
                 "category_name": category_name,
                 "category_icon": category_icon,
                 "category_color": category_color,
-                "bank_account_id": transaction.bank_account_id,
                 "receipt_photo_url": transaction.receipt_photo_url,
                 "created_at": transaction.created_at,
                 "updated_at": transaction.updated_at
@@ -278,8 +260,9 @@ class TransactionService:
         file_path = f"{upload_dir}/{unique_filename}"
 
         # Сохраняем файл
+        content = await file.read()
         with open(file_path, "wb") as buffer:
-            buffer.write(await file.read())
+            buffer.write(content)
 
         # Относительный путь для сохранения в БД
         relative_path = f"/receipts/{user_id}/{unique_filename}"
@@ -291,7 +274,7 @@ class TransactionService:
         return relative_path
 
     @staticmethod
-    async def group_transactions_by_date(transactions: List[Dict]) -> Dict:
+    async def group_transactions_by_date(transactions: List[Dict]) -> List[Dict]:
         """Группировка транзакций по дате для вывода в формате секций"""
         result = {}
 
