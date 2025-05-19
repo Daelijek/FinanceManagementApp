@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
+    # Настройки для загрузки файлов
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_SIZE: int = 10_485_760  # 10 МБ
+
     # Безопасность
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
