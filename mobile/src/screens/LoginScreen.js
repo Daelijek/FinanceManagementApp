@@ -13,7 +13,7 @@ import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
 
-const API_URL = "https://5771-85-159-27-203.ngrok-free.app";
+const API_URL = "https://3319-85-159-27-203.ngrok-free.app";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
