@@ -1,5 +1,5 @@
 # app/models/user.py
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, Date
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -18,6 +18,12 @@ class User(Base):
     # OAuth поля
     oauth_provider = Column(String, nullable=True)  # 'google', 'apple', None
     oauth_id = Column(String, nullable=True)
+
+    # Новые поля персональной информации
+    phone_number = Column(String, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    address = Column(String, nullable=True)
+    tax_residence = Column(String, nullable=True)
 
     # Служебные поля
     created_at = Column(DateTime(timezone=True), server_default=func.now())
