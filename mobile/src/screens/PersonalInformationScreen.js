@@ -1,6 +1,5 @@
 // PersonalInformationScreen.js
-
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import {
     StyleSheet,
     Text,
@@ -11,29 +10,184 @@ import {
     Image,
     TextInput,
     Platform,
+    Alert,
+    ActivityIndicator,
+    Modal,
+    Pressable,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../context/ThemeContext";
+
+// Вынесите API_URL в единый конфиг, чтобы не дублировать
+const API_URL = "https://ba2f-85-159-27-203.ngrok-free.app";
+
+const COUNTRIES = [
+    { label: "United States", code: "US" },
+    { label: "Kazakhstan", code: "KZ" },
+    { label: "Bangladesh", code: "BD" },
+];
+
 
 export default function PersonalInformationScreen() {
     const { theme } = useContext(ThemeContext);
     const isDark = theme === "dark";
 
-    // состояния полей
-    const [fullName, setFullName] = useState("Walter White");
-    const [email, setEmail] = useState("walter.white@breakingbad.com");
-    const [phone, setPhone] = useState("+1 (505) 555-0199");
-    const [dob, setDob] = useState(new Date(1958, 8, 7)); // 7 Sep 1958
-    const [tempDob, setTempDob] = useState(dob);
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
+    const [dob, setDob] = useState(null);
+    const [tempDob, setTempDob] = useState(null);
     const [showDobPicker, setShowDobPicker] = useState(false);
-    const [address, setAddress] = useState(
-        "308 Negra Arroyo Lane, Albuquerque, NM 87104"
-    );
-    const [taxResidence, setTaxResidence] = useState("United States");
+    const [address, setAddress] = useState("");
+    const [taxResidence, setTaxResidence] = useState("");
+    const [photoUrl, setPhotoUrl] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    // логика выбора даты рождения
-    const onChangeDob = (event, selected) => {
+    const [modalVisible, setModalVisible] = useState(false);
+    const selectedCountry = COUNTRIES.find(c => c.code === taxResidence);
+
+    const getToken = async () => {
+        try {
+            return await AsyncStorage.getItem("token");
+        } catch (e) {
+            console.error("Ошибка при getToken:", e);
+            return null;
+        }
+    };
+
+    const formatDate = (d) =>
+        d
+            ? d.toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+            })
+            : "";
+
+    useEffect(() => {
+        (async () => {
+            setLoading(true);
+            const token = await getToken();
+            const url = `${API_URL}/api/v1/users/me/personal`;
+            console.log("GET personal:", url, "token:", token);
+            try {
+                const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) throw new Error(`Status ${res.status}`);
+                const data = await res.json();
+
+                setFullName(data.full_name || "");
+                setEmail(data.email || "");
+                setPhone(data.phone_number || "");
+                setAddress(data.address || "");
+                setTaxResidence(data.tax_residence || "");
+                if (data.date_of_birth) {
+                    const d = new Date(data.date_of_birth);
+                    setDob(d);
+                    setTempDob(d);
+                }
+                if (data.photo_url) {
+                    setPhotoUrl(data.photo_url);
+                }
+            } catch (err) {
+                console.error("Load profile error:", err);
+                Alert.alert("Ошибка", "Не удалось загрузить данные профиля");
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, []);
+
+    const onSave = async () => {
+        setSaving(true);
+        const token = await getToken();
+        const url = `${API_URL}/api/v1/users/me/personal`;
+        console.log("PUT personal:", url);
+        const body = {
+            full_name: fullName,
+            phone_number: phone,
+            date_of_birth: dob ? dob.toISOString().split("T")[0] : null,
+            address,
+            tax_residence: selectedCountry
+                ? `${selectedCountry.label} (${selectedCountry.code})`
+                : taxResidence,
+        };
+        try {
+            const res = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const updated = await res.json();
+
+            setFullName(updated.full_name || "");
+            setPhone(updated.phone_number || "");
+            setAddress(updated.address || "");
+            setTaxResidence(updated.tax_residence || "");
+            if (updated.date_of_birth) {
+                const d = new Date(updated.date_of_birth);
+                setDob(d);
+                setTempDob(d);
+            }
+            Alert.alert("Успешно", "Данные сохранены");
+        } catch (err) {
+            console.error("Save profile error:", err);
+            Alert.alert("Ошибка", "Не удалось сохранить данные");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const onChangePhoto = async () => {
+        try {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+                Alert.alert("Внимание", "Нужен доступ к фотогалерее");
+                return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.7,
+            });
+            if (result.cancelled) return;
+
+            const uri = result.uri;
+            const name = uri.split("/").pop();
+            const match = /\.(\w+)$/.exec(name);
+            const type = match ? `image/${match[1]}` : "image";
+
+            const formData = new FormData();
+            formData.append("file", { uri, name, type });
+
+            const token = await getToken();
+            const url = `${API_URL}/api/v1/users/me/photo`;
+            console.log("POST photo:", url);
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const newUrl = await res.text();
+            setPhotoUrl(newUrl);
+            Alert.alert("Успешно", "Фото обновлено");
+        } catch (err) {
+            console.error("Upload photo error:", err);
+            Alert.alert("Ошибка", "Не удалось загрузить фото");
+        }
+    };
+
+    const onChangeDob = (e, selected) => {
         if (Platform.OS === "android") {
             setShowDobPicker(false);
             if (selected) setDob(selected);
@@ -49,16 +203,19 @@ export default function PersonalInformationScreen() {
         setShowDobPicker(false);
         setTempDob(dob);
     };
-    const formatDate = (d) =>
-        d.toLocaleDateString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
 
-    const onChangePhoto = () => { };
-    const onSave = () => { };
-    const onSelectTaxResidence = () => { };
+    const onSelectCountry = (code) => {
+        setTaxResidence(code);
+        setModalVisible(false);
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loader}>
+                <ActivityIndicator size="large" />
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView
@@ -74,7 +231,11 @@ export default function PersonalInformationScreen() {
                 {/* Аватар */}
                 <View style={styles.avatarWrapper}>
                     <Image
-                        source={require("../../assets/walter.png")}
+                        source={
+                            photoUrl
+                                ? { uri: photoUrl }
+                                : require("../../assets/walter.png")
+                        }
                         style={styles.avatar}
                     />
                     <TouchableOpacity
@@ -125,7 +286,7 @@ export default function PersonalInformationScreen() {
                     />
                 </View>
 
-                {/* Email Address */}
+                {/* Email */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -143,11 +304,7 @@ export default function PersonalInformationScreen() {
                                 isDark ? styles.inputDark : styles.inputLight,
                             ]}
                             value={email}
-                            onChangeText={setEmail}
-                            placeholder="Email Address"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                            editable={false}
                         />
                         <Ionicons
                             name="checkmark-circle"
@@ -177,15 +334,9 @@ export default function PersonalInformationScreen() {
                             ]}
                             value={phone}
                             onChangeText={setPhone}
-                            placeholder="Phone Number"
                             keyboardType="phone-pad"
+                            placeholder="Phone Number"
                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
-                        />
-                        <Ionicons
-                            name="checkmark-circle"
-                            size={20}
-                            color="#10B981"
-                            style={styles.statusIcon}
                         />
                     </View>
                 </View>
@@ -224,7 +375,6 @@ export default function PersonalInformationScreen() {
                             {formatDate(dob)}
                         </Text>
                     </TouchableOpacity>
-
                     {showDobPicker &&
                         (Platform.OS === "ios" ? (
                             <View
@@ -253,7 +403,7 @@ export default function PersonalInformationScreen() {
                             </View>
                         ) : (
                             <DateTimePicker
-                                value={dob}
+                                value={dob || new Date()}
                                 mode="date"
                                 display="default"
                                 onChange={onChangeDob}
@@ -279,8 +429,8 @@ export default function PersonalInformationScreen() {
                         ]}
                         value={address}
                         onChangeText={setAddress}
-                        placeholder="Address"
                         multiline
+                        placeholder="Address"
                         placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                     />
                 </View>
@@ -302,18 +452,16 @@ export default function PersonalInformationScreen() {
                             styles.withArrow,
                             isDark ? styles.inputDark : styles.inputLight,
                         ]}
+                        onPress={() => setModalVisible(true)}
                         activeOpacity={0.7}
-                        onPress={onSelectTaxResidence}
                     >
                         <Text
                             style={[
                                 styles.inputText,
-                                isDark
-                                    ? styles.inputTextDark
-                                    : styles.inputTextLight,
+                                isDark ? styles.inputTextDark : styles.inputTextLight,
                             ]}
                         >
-                            {taxResidence}
+                            {selectedCountry ? `${selectedCountry.label} (${selectedCountry.code})` : "Select Country"}
                         </Text>
                         <Ionicons
                             name="chevron-forward"
@@ -327,17 +475,40 @@ export default function PersonalInformationScreen() {
                 <TouchableOpacity
                     style={[
                         styles.saveButton,
-                        isDark
-                            ? styles.saveButtonDark
-                            : styles.saveButtonLight,
+                        isDark ? styles.saveButtonDark : styles.saveButtonLight,
                     ]}
                     onPress={onSave}
                     activeOpacity={0.8}
+                    disabled={saving}
                 >
-                    <Text style={styles.saveButtonText}>
-                        Save Changes
-                    </Text>
+                    {saving ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                    )}
                 </TouchableOpacity>
+
+                {/* Modal выбора страны */}
+                <Modal transparent visible={modalVisible} animationType="fade">
+                    <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+                        <View style={styles.modalContainer}>
+                            {COUNTRIES.map(({ label, code }) => (
+                                <Pressable
+                                    key={code}
+                                    onPress={() => {
+                                        setTaxResidence(code);
+                                        setModalVisible(false);
+                                    }}
+                                    style={styles.modalOption}
+                                >
+                                    <Text style={styles.modalText}>
+                                        {label} ({code})
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </Pressable>
+                </Modal>
             </ScrollView>
         </SafeAreaView>
     );
@@ -506,4 +677,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
     },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    modalContainer: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 12,
+        padding: 20,
+        width: "80%",
+    },
+    modalOption: {
+        paddingVertical: 12,
+    },
+    modalText: {
+        fontSize: 16,
+        color: "#2563EB",
+        textAlign: "center",
+    },
+
 });

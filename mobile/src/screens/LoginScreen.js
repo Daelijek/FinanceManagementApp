@@ -12,8 +12,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL = "https://555e-85-159-27-203.ngrok-free.app";
+const API_URL = "https://ba2f-85-159-27-203.ngrok-free.app";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -34,37 +35,42 @@ const LoginScreen = ({ navigation }) => {
         }
       );
 
-      // Всегда читаем как текст, чтобы не упасть на синтаксисе
       const rawBody = await response.text();
       console.log("HTTP", response.status, "raw body:", rawBody);
 
-      // Пытаемся разобрать JSON, но не падаем
       let data = null;
       try {
         data = JSON.parse(rawBody);
       } catch {
-        // если не JSON — оставляем data = null
+        // Если не JSON — оставляем data = null
       }
 
       if (response.ok) {
         // Успешный вход
         console.log("Login successful:", data);
-        // TODO: сохраняем токены из data.access_token и data.refresh_token
+
+        if (data && data.access_token) {
+          await AsyncStorage.setItem("token", data.access_token);
+          const savedToken = await AsyncStorage.getItem("token");
+          console.log("Проверка сохранённого токена:", savedToken);
+          // При необходимости можно сохранить и refresh_token:
+          // await AsyncStorage.setItem("refresh_token", data.refresh_token);
+        } else {
+          console.warn("Токен доступа не найден в ответе");
+        }
+
         return navigation.navigate("MainPage");
       }
 
-      // Ошибочный статус: HTTP 4xx или 5xx
       let message = "";
 
       if (data && data.detail) {
-        // detail может быть строкой или массивом
         if (Array.isArray(data.detail)) {
           message = data.detail.map((e) => e.msg).join("\n");
         } else {
           message = data.detail;
         }
       } else {
-        // не JSON или неожиданное поле — показываем чистый текст
         message = rawBody || "Неизвестная ошибка при входе.";
       }
 

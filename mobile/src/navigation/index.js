@@ -25,6 +25,7 @@ import PasswordResetConfirmScreen from "../screens/PasswordResetConfirmScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import PersonalInformationScreen from "../screens/PersonalInformationScreen";
+import BudgetCategoriesScreen from "../screens/BudgetCategoriesScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -130,6 +131,12 @@ const AppNavigator = () => {
       <Stack.Screen
         name="Personal Information"
         component={PersonalInformationScreen}
+        options={makeBackOptions}
+      />
+      
+      <Stack.Screen
+        name="Budget Categories"
+        component={BudgetCategoriesScreen}
         options={makeBackOptions}
       />
     </Stack.Navigator>

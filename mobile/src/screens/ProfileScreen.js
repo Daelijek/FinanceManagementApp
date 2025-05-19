@@ -16,6 +16,7 @@ const ProfileScreen = ({ navigation }) => {
   const onPrivacyPolicy = () => navigation.navigate("Privacy Policy")
   const onAppSettings = () => navigation.navigate("App Settings")
   const onPersonalInformation = () => navigation.navigate("Personal Information")
+  const onBudgetCategories = () => navigation.navigate("Budget Categories")
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
@@ -189,7 +190,7 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingBorderlessItem}>
+            <TouchableOpacity onPress={onBudgetCategories} style={styles.settingBorderlessItem}>
               <View style={styles.itemGroup}>
                 <Ionicons
                   name="document-text-outline"
