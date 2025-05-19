@@ -1,18 +1,17 @@
 # app/schemas/transaction.py
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime, date
-from app.models.transaction import TransactionTypeEnum, PaymentMethodEnum
-from decimal import Decimal
+from app.models.category import CategoryTypeEnum
+from app.models.transaction import PaymentMethodEnum
 
 
 class TransactionBase(BaseModel):
     amount: float
-    transaction_type: TransactionTypeEnum
+    transaction_type: CategoryTypeEnum
     description: Optional[str] = None
     transaction_date: datetime
     category_id: Optional[int] = None
-    bank_account_id: Optional[int] = None
     payment_method: Optional[PaymentMethodEnum] = None
     is_recurring: bool = False
     note: Optional[str] = None
@@ -28,11 +27,10 @@ class TransactionCreate(TransactionBase):
 
 class TransactionUpdate(BaseModel):
     amount: Optional[float] = None
-    transaction_type: Optional[TransactionTypeEnum] = None
+    transaction_type: Optional[CategoryTypeEnum] = None
     description: Optional[str] = None
     transaction_date: Optional[datetime] = None
     category_id: Optional[int] = None
-    bank_account_id: Optional[int] = None
     payment_method: Optional[PaymentMethodEnum] = None
     is_recurring: Optional[bool] = None
     note: Optional[str] = None
@@ -67,7 +65,7 @@ class TransactionSummary(BaseModel):
 class TransactionFilters(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    transaction_type: Optional[TransactionTypeEnum] = None
+    transaction_type: Optional[CategoryTypeEnum] = None
     category_ids: Optional[List[int]] = None
     min_amount: Optional[float] = None
     max_amount: Optional[float] = None

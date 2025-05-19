@@ -3,12 +3,8 @@ from sqlalchemy import Column, String, Boolean, DateTime, Integer, Float, Foreig
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
+from app.models.category import CategoryTypeEnum
 import enum
-
-
-class TransactionTypeEnum(str, enum.Enum):
-    EXPENSE = "expense"
-    INCOME = "income"
 
 
 class PaymentMethodEnum(str, enum.Enum):
@@ -23,11 +19,10 @@ class Transaction(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=True)
-    bank_account_id = Column(Integer, ForeignKey("bank_accounts.id"), nullable=True)
 
     # Основная информация
     amount = Column(Float, nullable=False)
-    transaction_type = Column(Enum(TransactionTypeEnum), default=TransactionTypeEnum.EXPENSE, nullable=False)
+    transaction_type = Column(Enum(CategoryTypeEnum), nullable=False)
     description = Column(Text, nullable=True)
     transaction_date = Column(DateTime(timezone=True), nullable=False)
 
@@ -40,7 +35,6 @@ class Transaction(Base):
     # Связи
     user = relationship("User", backref="transactions")
     category = relationship("BudgetCategory", backref="transactions")
-    bank_account = relationship("BankAccount", backref="transactions")
 
     # Служебные поля
     created_at = Column(DateTime(timezone=True), server_default=func.now())
