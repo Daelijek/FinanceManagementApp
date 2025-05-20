@@ -20,9 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../context/ThemeContext";
-
-// Вынесите API_URL в единый конфиг, чтобы не дублировать
-const API_URL = "https://ba2f-85-159-27-203.ngrok-free.app";
+import { API_URL } from '../config';
 
 const COUNTRIES = [
     { label: "United States", code: "US" },
@@ -38,8 +36,8 @@ export default function PersonalInformationScreen() {
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
-    const [dob, setDob] = useState(null);
-    const [tempDob, setTempDob] = useState(null);
+    const [dob, setDob] = useState(new Date());
+    const [tempDob, setTempDob] = useState(new Date());
     const [showDobPicker, setShowDobPicker] = useState(false);
     const [address, setAddress] = useState("");
     const [taxResidence, setTaxResidence] = useState("");

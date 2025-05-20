@@ -11,8 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
-
-const API_URL = "https://ba2f-85-159-27-203.ngrok-free.app";
+import { API_URL } from '../config';
 
 const ForgotPasswordScreen = ({ navigation }) => {
     const [email, setEmail] = useState("");

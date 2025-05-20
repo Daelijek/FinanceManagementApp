@@ -13,8 +13,7 @@ import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const API_URL = "https://ba2f-85-159-27-203.ngrok-free.app";
+import { API_URL } from '../config';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
