@@ -34,7 +34,7 @@ class Transaction(Base):
 
     # Связи
     user = relationship("User", backref="transactions")
-    category = relationship("BudgetCategory", backref="transactions")
+    category = relationship("BudgetCategory", back_populates="transactions")
 
     # Служебные поля
     created_at = Column(DateTime(timezone=True), server_default=func.now())
