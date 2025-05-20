@@ -10,7 +10,21 @@ from app.services.pydantic_helpers import model_to_dict
 class CategoryService:
     @staticmethod
     async def create_category(user_id: int, category_data: CategoryCreate, db: Session) -> BudgetCategory:
-        """Создание новой категории бюджета"""
+        """Создание новой категории бюджета с проверкой уникальности имени"""
+
+        # Проверка на дубликат имени категории для данного пользователя и типа
+        existing = db.query(BudgetCategory).filter(
+            BudgetCategory.user_id == user_id,
+            BudgetCategory.name == category_data.name,
+            BudgetCategory.category_type == category_data.category_type
+        ).first()
+
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Категория с названием '{category_data.name}' уже существует"
+            )
+
         # Создаем категорию
         category_dict = model_to_dict(category_data)
         category = BudgetCategory(user_id=user_id, **category_dict)
