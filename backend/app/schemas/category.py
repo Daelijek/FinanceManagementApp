@@ -1,7 +1,8 @@
 # app/schemas/category.py
 from pydantic import BaseModel, model_validator
-from typing import Optional, List, Any
+from typing import Optional, List
 from datetime import datetime
+from app.models.category import CategoryTypeEnum
 
 
 # Базовые схемы для категории бюджета
@@ -10,8 +11,8 @@ class CategoryBase(BaseModel):
     description: Optional[str] = None
     icon: Optional[str] = None
     color: Optional[str] = None
-    is_income: bool = False
-    parent_id: Optional[int] = None
+    category_type: CategoryTypeEnum = CategoryTypeEnum.EXPENSE
+    position: Optional[int] = 0
 
 
 class CategoryCreate(CategoryBase):
@@ -23,8 +24,8 @@ class CategoryUpdate(BaseModel):
     description: Optional[str] = None
     icon: Optional[str] = None
     color: Optional[str] = None
-    is_income: Optional[bool] = None
-    parent_id: Optional[int] = None
+    category_type: Optional[CategoryTypeEnum] = None
+    position: Optional[int] = None
 
 
 class CategoryResponse(CategoryBase):
@@ -38,26 +39,9 @@ class CategoryResponse(CategoryBase):
         from_attributes = True
 
 
-# Рекурсивная схема для категорий с подкатегориями
-class CategoryWithSubcategories(CategoryResponse):
-    subcategories: List['CategoryWithSubcategories'] = []
-
-    class Config:
-        from_attributes = True
-
-
-# Разрешаем рекурсивное определение
-CategoryWithSubcategories.model_rebuild()
-
-
 # Схемы для системных категорий
-class SystemCategoryBase(BaseModel):
-    id: int
-    name: str
-    icon: Optional[str] = None
-    color: Optional[str] = None
-    is_income: bool
-    parent_id: Optional[int] = None
+class SystemCategoryBase(CategoryResponse):
+    pass
 
 
 class SystemCategoriesResponse(BaseModel):
