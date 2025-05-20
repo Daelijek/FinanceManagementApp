@@ -18,6 +18,7 @@ import {
 import { ThemeContext } from "../context/ThemeContext";
 
 const TransactionAdd = () => {
+  const [amount, setAmount] = useState("0.00");
   const [selectedType, setSelectedType] = useState("expense");
   const [selectedCategory, setSelectedCategory] = useState();
   const [date, setDate] = useState(new Date());
@@ -137,13 +138,23 @@ const TransactionAdd = () => {
               </Text>
             </TouchableOpacity>
           </View>
+
           <View style={styles.balance}>
             <Text style={styles.balanceValue}>$</Text>
-            {selectedType === "expense" ? (
-              <Text style={styles.balanceAmount}>0.00</Text>
-            ) : (
-              <Text style={styles.balanceAmount}>194532.53</Text>
-            )}
+            <TextInput
+              style={styles.balanceAmountInput}
+              placeholder="0.00"
+              placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+              keyboardType="numeric"
+              value={amount}
+              onChangeText={(text) => {
+                // Разрешаем только числа и точку, при этом не более одной точки
+                const cleaned = text.replace(/[^0-9.]/g, '');
+                const valid = cleaned.split('.').length <= 2 ? cleaned : amount;
+                setAmount(valid);
+              }}
+              maxLength={12}
+            />
           </View>
 
           <View style={styles.category}>
@@ -742,6 +753,15 @@ const getThemedStyles = (isDark) =>
       color: isDark ? "#FFFFFF" : "#000000",
       fontSize: 36,
       fontWeight: "600",
+    },
+    balanceAmountInput: {
+      fontSize: 36,
+      fontWeight: "600",
+      color: isDark ? "#FFFFFF" : "#000000",
+      marginLeft: 4,
+      padding: 0,
+      borderBottomWidth: 0,
+      textAlignVertical: "center",
     },
     category: {
       marginBottom: 30,
