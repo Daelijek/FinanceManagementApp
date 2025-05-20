@@ -1,4 +1,4 @@
-# app/models/user.py
+# app/models/user.py (добавление поля для фото профиля)
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, Date
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -15,11 +15,14 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
 
+    # Добавляем URL фото профиля
+    profile_photo_url = Column(String, nullable=True)
+
     # OAuth поля
     oauth_provider = Column(String, nullable=True)  # 'google', 'apple', None
     oauth_id = Column(String, nullable=True)
 
-    # Новые поля персональной информации
+    # Персональные данные
     phone_number = Column(String, nullable=True)
     date_of_birth = Column(Date, nullable=True)
     address = Column(String, nullable=True)

@@ -1,6 +1,6 @@
 # app/services/auth.py
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models.user import User
@@ -11,10 +11,9 @@ from app.config import settings
 from app.services.profile import ProfileService
 from app.schemas.profile import ProfileCreate, FinancialDataCreate
 from app.models.financial import SubscriptionTypeEnum
-from datetime import datetime, timedelta
-import httpx
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
+from app.utils.oauth import GoogleOAuth, MicrosoftOAuth
+import os
+import uuid
 
 
 class AuthService:
@@ -135,45 +134,115 @@ class AuthService:
         """OAuth вход/регистрация"""
         user_info = None
 
-        if oauth_data.provider == "google":
-            user_info = await AuthService._verify_google_token(oauth_data.id_token)
-        elif oauth_data.provider == "apple":
-            user_info = await AuthService._verify_apple_token(oauth_data.id_token)
-        else:
+        try:
+            if oauth_data.provider == "google":
+                # Получение токена из кода авторизации и проверка
+                if oauth_data.redirect_uri:
+                    token_data = await GoogleOAuth.get_token_from_code(
+                        oauth_data.token,
+                        oauth_data.redirect_uri
+                    )
+                    user_info = token_data["user_info"]
+                else:
+                    # Используем переданный ID token напрямую
+                    user_info = await GoogleOAuth.verify_token(oauth_data.token)
+
+            elif oauth_data.provider == "microsoft":
+                # Получение токена из кода авторизации и проверка
+                token_data = await MicrosoftOAuth.get_token_from_code(
+                    oauth_data.token,
+                    oauth_data.redirect_uri
+                )
+                user_info = token_data["user_info"]
+
+                # Получаем и сохраняем фото профиля, если оно доступно
+                if "access_token" in token_data:
+                    profile_photo = await MicrosoftOAuth.get_profile_photo(token_data["access_token"])
+                    if profile_photo:
+                        # Сохраняем фото профиля во временный файл
+                        photo_url = await AuthService._save_profile_photo(profile_photo, user_info["sub"])
+                        user_info["picture"] = photo_url
+
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid OAuth provider"
+                )
+        except ValueError as e:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OAuth provider"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e)
             )
 
         if not user_info:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid OAuth token"
+                detail="Failed to get user info from provider"
             )
 
-        # Ищем или создаем пользователя
-        user = db.query(User).filter(
-            User.email == user_info["email"]
-        ).first()
+        # Обязательно должен быть email или sub
+        if not user_info.get("email") and not user_info.get("sub"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User email or ID not provided by OAuth provider"
+            )
+
+        # Ищем пользователя сначала по OAuth ID
+        user = None
+        if user_info.get("sub"):
+            user = db.query(User).filter(
+                User.oauth_provider == oauth_data.provider,
+                User.oauth_id == user_info["sub"]
+            ).first()
+
+        # Затем по email, если пользователь не найден и email предоставлен
+        if not user and user_info.get("email"):
+            user = db.query(User).filter(User.email == user_info["email"]).first()
 
         if not user:
             # Создаем нового пользователя
+            name = user_info.get("name", "")
+            email = user_info.get("email", f"{user_info['sub']}@{oauth_data.provider}.user")
+
             user = User(
-                email=user_info["email"],
-                full_name=user_info.get("name", ""),
+                email=email,
+                full_name=name,
                 oauth_provider=oauth_data.provider,
                 oauth_id=user_info["sub"],
-                is_verified=True  # OAuth пользователи считаются верифицированными
+                is_verified=True,  # OAuth пользователи считаются верифицированными
+                profile_photo_url=user_info.get("picture")
             )
             db.add(user)
             db.commit()
             db.refresh(user)
+
+            # Создаем профиль и финансовые данные
+            profile_data = ProfileCreate()
+            profile = await ProfileService.create_profile(user.id, profile_data, db)
+
+            # Устанавливаем тип подписки
+            expires_at = datetime.utcnow() + timedelta(days=365)
+            await ProfileService.update_subscription(user.id, SubscriptionTypeEnum.FREE, expires_at, db)
+
+            # Создаем финансовые данные
+            financial_data = FinancialDataCreate(
+                balance=0.0,
+                savings=0.0,
+                credit_score=0
+            )
+            await ProfileService.create_financial_data(profile.id, financial_data, db)
+
         else:
             # Обновляем данные существующего пользователя
             if not user.oauth_provider:
                 user.oauth_provider = oauth_data.provider
                 user.oauth_id = user_info["sub"]
-                db.commit()
+
+            # Обновляем фото профиля, если предоставлено
+            if user_info.get("picture") and user.profile_photo_url != user_info["picture"]:
+                user.profile_photo_url = user_info["picture"]
+
+            db.commit()
 
         # Создаем токены
         access_token = SecurityUtils.create_access_token(data={"sub": str(user.id)})
@@ -185,29 +254,22 @@ class AuthService:
         )
 
     @staticmethod
-    async def _verify_google_token(token: str) -> Optional[dict]:
-        """Верификация Google токена"""
-        try:
-            idinfo = id_token.verify_oauth2_token(
-                token,
-                google_requests.Request(),
-                settings.GOOGLE_CLIENT_ID
-            )
+    async def _save_profile_photo(photo_data: bytes, user_identifier: str) -> str:
+        """Сохранение фото профиля из OAuth провайдера"""
+        # Создаем директорию для хранения фото
+        upload_dir = f"{settings.UPLOAD_DIR}/profile_photos"
+        os.makedirs(upload_dir, exist_ok=True)
 
-            return {
-                "email": idinfo["email"],
-                "name": idinfo.get("name", ""),
-                "sub": idinfo["sub"]
-            }
-        except ValueError:
-            return None
+        # Генерируем уникальное имя файла
+        unique_filename = f"{uuid.uuid4()}.jpg"
+        file_path = f"{upload_dir}/{unique_filename}"
 
-    @staticmethod
-    async def _verify_apple_token(token: str) -> Optional[dict]:
-        """Верификация Apple токена"""
-        # Здесь должна быть логика верификации Apple токена
-        # Это более сложный процесс, требующий работы с Apple API
-        pass
+        # Сохраняем файл
+        with open(file_path, "wb") as buffer:
+            buffer.write(photo_data)
+
+        # Возвращаем относительный путь
+        return f"/profile_photos/{unique_filename}"
 
     @staticmethod
     async def request_password_reset(email: str, db: Session) -> None:

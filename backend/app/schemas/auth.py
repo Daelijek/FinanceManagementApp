@@ -1,6 +1,6 @@
 # app/schemas/auth.py
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
+from typing import Optional, Literal
 
 
 # Схема для входа
@@ -42,6 +42,12 @@ class PasswordResetConfirm(BaseModel):
 
 # Схема для OAuth входа
 class OAuthLoginRequest(BaseModel):
-    provider: str  # 'google' или 'apple'
-    access_token: str  # Токен от OAuth провайдера
-    id_token: Optional[str] = None  # Для получения данных пользователя
+    provider: Literal['google', 'microsoft']
+    token: str  # Код авторизации
+    redirect_uri: Optional[str] = None
+
+
+# Схема для инициации OAuth процесса
+class OAuthInitRequest(BaseModel):
+    provider: Literal['google', 'microsoft']
+    redirect_uri: str

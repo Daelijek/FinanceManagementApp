@@ -32,11 +32,20 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     EMAILS_FROM_EMAIL: Optional[str] = None
 
-    # OAuth (Google, Apple)
+    # OAuth (Google)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
-    APPLE_CLIENT_ID: Optional[str] = None
-    APPLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: Optional[str] = None
+
+    # OAuth (Microsoft)
+    MICROSOFT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_CLIENT_SECRET: Optional[str] = None
+    MICROSOFT_REDIRECT_URI: Optional[str] = None
+    MICROSOFT_TENANT: str = "common"  # common, organizations, consumers, <tenant_id>
+
+    # Настройки для загрузки файлов
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_SIZE: int = 10_485_760  # 10 МБ
 
     class Config:
         env_file = ".env"
