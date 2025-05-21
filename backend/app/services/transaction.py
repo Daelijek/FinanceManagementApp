@@ -46,6 +46,9 @@ class TransactionService:
         db.commit()
         db.refresh(transaction)
 
+        from app.services.notification import NotificationService
+        await NotificationService.generate_transaction_notification(transaction.id, db)
+
         return transaction
 
     @staticmethod

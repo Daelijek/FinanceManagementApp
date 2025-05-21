@@ -1,6 +1,6 @@
 # app/api/v1/router.py
 from fastapi import APIRouter
-from app.api.v1 import auth, users, profile, settings, categories, transactions
+from app.api.v1 import auth, users, profile, settings, categories, transactions, notifications
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(profile.router)
 api_router.include_router(settings.router)
 api_router.include_router(categories.router)
 api_router.include_router(transactions.router)
+api_router.include_router(notifications.router)
