@@ -1,8 +1,9 @@
+// src/screens/TransactionAdd.js
+
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useRef, useContext } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Picker } from '@react-native-picker/picker';
 import {
   StyleSheet,
   Text,
@@ -14,94 +15,148 @@ import {
   TextInput,
   Modal,
   Pressable,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { ThemeContext } from "../context/ThemeContext";
+import { apiFetch } from "../api";
 
-const TransactionAdd = () => {
+const TransactionAdd = ({ navigation }) => {
   const [amount, setAmount] = useState("0.00");
   const [selectedType, setSelectedType] = useState("expense");
-  const [selectedCategory, setSelectedCategory] = useState();
+  const [categories, setCategories] = useState({ expense: [], income: [] });
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
-  const inputRef = useRef(null);
-  const [isRecurring, setIsRecurring] = useState(false);
 
-  const handlePress = () => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  };
+  const [note, setNote] = useState("");
+  const noteRef = useRef(null);
 
-  const [selectedMethod, setSelectedMethod] = useState(null); // 'cash' | 'card'
+  const [selectedMethod, setSelectedMethod] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const handleSelect = (method) => {
-    setSelectedMethod(method);
-    setModalVisible(false);
-  };
-
-  // Обработчик изменений в DateTimePicker
-  const onChange = (event, selectedDate) => {
-    // На Android выбор даты подтверждается сразу
-    if (Platform.OS === "android") {
-      setShowPicker(false);
-      if (selectedDate) {
-        setDate(selectedDate);
-      }
-    } else {
-      // На iOS дата "живет" во временном стейте, пока пользователь не нажмёт Confirm
-      setTempDate(selectedDate || date);
-    }
-  };
-
-  // Кнопка "Confirm" на iOS
-  const handleConfirm = () => {
-    setShowPicker(false);
-    setDate(tempDate);
-  };
-
-  // Кнопка "Cancel" на iOS
-  const handleCancel = () => {
-    setShowPicker(false);
-    setTempDate(date);
-  };
-
-  // Форматирование даты: если сегодня – добавляем "Today, ...", иначе "DD MMM YYYY"
-  const formatDate = (dateToFormat) => {
-    const today = new Date();
-    const isToday =
-      dateToFormat.getDate() === today.getDate() &&
-      dateToFormat.getMonth() === today.getMonth() &&
-      dateToFormat.getFullYear() === today.getFullYear();
-
-    // Пример: 15 Feb 2024
-    const formattedDate = dateToFormat.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-
-    return isToday ? `Today, ${formattedDate}` : formattedDate;
-  };
+  const [isRecurring, setIsRecurring] = useState(false);
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
 
-  const textColor = isDark ? "#F9FAFB" : "#1F2937";
-  const subTextColor = isDark ? "#9CA3AF" : "#4B5563";
-  const placeholderColor = isDark ? "#6B7280" : "#9CA3AF";
-  const iconColor = isDark ? "#D1D5DB" : "#4B5563";
-  const switchInactiveColor = isDark ? "#1F2937" : "#F3F4F6";
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const res = await apiFetch("/api/v1/categories/");
+        if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+        const data = await res.json();
+        setCategories({
+          expense: data.expense_categories || [],
+          income: data.income_categories || [],
+        });
+      } catch (e) {
+        console.error(e);
+        Alert.alert("Ошибка", "Не удалось загрузить категории.");
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  const formatDate = (d) => {
+    const today = new Date();
+    const isToday =
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear();
+    const str = d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return isToday ? `Today, ${str}` : str;
+  };
+
+  const onChangeDate = (event, selected) => {
+    if (Platform.OS === "android") {
+      setShowPicker(false);
+      selected && setDate(selected);
+    } else {
+      setTempDate(selected || date);
+    }
+  };
+
+  const confirmDate = () => {
+    setShowPicker(false);
+    setDate(tempDate);
+  };
+
+  const cancelDate = () => {
+    setShowPicker(false);
+    setTempDate(date);
+  };
+
+  const handleSave = async () => {
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) {
+      return Alert.alert("Ошибка", "Введите корректную сумму.");
+    }
+    if (!selectedCategoryId) {
+      return Alert.alert("Ошибка", "Выберите категорию.");
+    }
+    if (!selectedMethod) {
+      return Alert.alert("Ошибка", "Выберите способ оплаты.");
+    }
+
+    const body = {
+      amount: amt,
+      transaction_type: selectedType,
+      description: note.trim(),
+      transaction_date: date.toISOString(),
+      category_id: selectedCategoryId,
+      payment_method: selectedMethod,
+      is_recurring: isRecurring,
+      note: note.trim(),
+    };
+
+    try {
+      const res = await apiFetch("/api/v1/transactions/", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        Alert.alert("Успех", "Транзакция создана.");
+        navigation.goBack();
+      } else {
+        const err = await res.json();
+        const msg = Array.isArray(err.detail)
+          ? err.detail.map((e) => e.msg).join("\n")
+          : err.detail || "Неизвестная ошибка.";
+        Alert.alert("Ошибка", msg);
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Ошибка сети", "Не удалось связаться с сервером.");
+    }
+  };
+
+  const handleMethodSelect = (method) => {
+    setSelectedMethod(method);
+    setModalVisible(false);
+  };
+
+  const IconCmp = (iconName) =>
+    iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        bounces={false} // Отключает эффект перетягивания вверх/вниз на iOS
-        overScrollMode="never" // Отключает overscroll на Android
-        showsVerticalScrollIndicator={false} // Скрывает полосу прокрутки
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.content}>
           <View style={styles.switch}>
@@ -115,7 +170,7 @@ const TransactionAdd = () => {
               <Text
                 style={[
                   styles.switchText,
-                  { color: selectedType === "expense" ? "#FFFFFF" : textColor },
+                  { color: selectedType === "expense" ? "#fff" : styles.switchText.color },
                 ]}
               >
                 Expense
@@ -131,7 +186,7 @@ const TransactionAdd = () => {
               <Text
                 style={[
                   styles.switchText,
-                  { color: selectedType === "income" ? "#FFFFFF" : textColor },
+                  { color: selectedType === "income" ? "#fff" : styles.switchText.color },
                 ]}
               >
                 Income
@@ -147,11 +202,9 @@ const TransactionAdd = () => {
               placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
               keyboardType="numeric"
               value={amount}
-              onChangeText={(text) => {
-                // Разрешаем только числа и точку, при этом не более одной точки
-                const cleaned = text.replace(/[^0-9.]/g, '');
-                const valid = cleaned.split('.').length <= 2 ? cleaned : amount;
-                setAmount(valid);
+              onChangeText={(t) => {
+                const cleaned = t.replace(/[^0-9.]/g, "");
+                setAmount(cleaned.split(".").length <= 2 ? cleaned : amount);
               }}
               maxLength={12}
             />
@@ -159,395 +212,48 @@ const TransactionAdd = () => {
 
           <View style={styles.category}>
             <Text style={styles.categoryTitle}>Category</Text>
-            <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
-              <View style={styles.categoryGroup}>
-                {selectedType === "expense" ? (
-                  <>
-                    {/* Shopping */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("shopping")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "shopping" &&
-                          styles.selectedCategory,
-                        ]}
+            {loadingCategories ? (
+              <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.categoryGroup}>
+                  {categories[selectedType].map((cat) => {
+                    const Icon = IconCmp(cat.icon);
+                    const isSel = cat.id === selectedCategoryId;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        onPress={() => setSelectedCategoryId(cat.id)}
+                        style={styles.categoryCard}
                       >
-                        <Ionicons
-                          name={
-                            selectedCategory === "shopping"
-                              ? "cart-outline"
-                              : "cart"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "shopping" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Shopping</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Food */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("food")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "food" && styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "food"
-                              ? "restaurant-outline"
-                              : "restaurant"
-                          }
-                          size={32}
-                          color={selectedCategory === "food" ? "#fff" : "#4B5563"}
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Food</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Transport */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("transport")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "transport" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "transport"
-                              ? "car-outline"
-                              : "car"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "transport" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Transport</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Bills */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("bills")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "bills" && styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "bills"
-                              ? "receipt-outline"
-                              : "receipt"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "bills" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Bills</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Health Care */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("healthCare")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "healthCare" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "healthCare"
-                              ? "medkit-outline"
-                              : "medkit"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "healthCare" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Health Care</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Entertainment */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("entertainment")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "entertainment" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "entertainment"
-                              ? "game-controller-outline"
-                              : "game-controller"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "entertainment"
-                              ? "#fff"
-                              : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Entertainment</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Travel */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("travel")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "travel" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "travel"
-                              ? "airplane-outline"
-                              : "airplane"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "travel" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Travel</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Subscription */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("subscription")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "subscription" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "subscription"
-                              ? "tv-outline"
-                              : "tv"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "subscription"
-                              ? "#fff"
-                              : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Subscription</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    {/* Salary */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("salary")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "salary" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "salary"
-                              ? "briefcase-outline"
-                              : "briefcase"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "salary" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Salary</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Investment */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("investment")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "investment" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "investment"
-                              ? "trending-up-outline"
-                              : "trending-up"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "investment" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Investment</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Savings */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("savings")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "savings" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name={
-                            selectedCategory === "savings"
-                              ? "piggy-bank-outline"
-                              : "piggy-bank"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "savings" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Savings</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Bonus */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("bonus")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "bonus" && styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "bonus" ? "gift-outline" : "gift"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "bonus" ? "#fff" : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Bonus</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Other Income */}
-                    <TouchableOpacity
-                      onPress={() => setSelectedCategory("otherIncome")}
-                      style={styles.categoryCard}
-                    >
-                      <View
-                        style={[
-                          styles.categoryIcon,
-                          selectedCategory === "otherIncome" &&
-                          styles.selectedCategory,
-                        ]}
-                      >
-                        <Ionicons
-                          name={
-                            selectedCategory === "otherIncome"
-                              ? "document-text-outline"
-                              : "document-text"
-                          }
-                          size={32}
-                          color={
-                            selectedCategory === "otherIncome"
-                              ? "#fff"
-                              : "#4B5563"
-                          }
-                        />
-                      </View>
-                      <View style={styles.categoryLabel}>
-                        <Text style={styles.categoryText}>Other Income</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </ScrollView>
+                        <View
+                          style={[
+                            styles.categoryIcon,
+                            isSel && styles.selectedCategory,
+                            { backgroundColor: isSel ? cat.color : styles.categoryIcon.backgroundColor },
+                          ]}
+                        >
+                          <Icon
+                            name={cat.icon}
+                            size={32}
+                            color={isSel ? "#fff" : cat.color}
+                          />
+                        </View>
+                        <View style={styles.categoryLabel}>
+                          <Text style={[styles.categoryText, isSel && { color: cat.color }]}>
+                            {cat.name}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
           </View>
+
           <View style={styles.transactionDetails}>
             <View style={styles.transactionDate}>
-              {/* Кнопка (поле) для отображения выбранной даты */}
               <TouchableOpacity
                 style={styles.dateInput}
                 onPress={() => setShowPicker(true)}
@@ -558,16 +264,14 @@ const TransactionAdd = () => {
                   <Text style={styles.dateText}>{formatDate(date)}</Text>
                 </View>
               </TouchableOpacity>
-
-              {/* Сам DateTimePicker */}
               {showPicker &&
                 (Platform.OS === "ios" ? (
                   <View style={styles.iosPickerContainer}>
                     <View style={styles.iosPickerHeader}>
-                      <TouchableOpacity onPress={handleCancel}>
+                      <TouchableOpacity onPress={cancelDate}>
                         <Text style={styles.cancelButton}>Cancel</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={handleConfirm}>
+                      <TouchableOpacity onPress={confirmDate}>
                         <Text style={styles.confirmButton}>Confirm</Text>
                       </TouchableOpacity>
                     </View>
@@ -575,7 +279,7 @@ const TransactionAdd = () => {
                       value={tempDate}
                       mode="date"
                       display="inline"
-                      onChange={onChange}
+                      onChange={onChangeDate}
                       style={styles.iosPicker}
                     />
                   </View>
@@ -584,26 +288,27 @@ const TransactionAdd = () => {
                     value={date}
                     mode="date"
                     display="default"
-                    onChange={onChange}
+                    onChange={onChangeDate}
                   />
                 ))}
             </View>
+
             <View style={styles.transactionNote}>
               <TouchableOpacity
                 style={styles.transactionNoteInner}
-                onPress={handlePress}
-                activeOpacity={0.3} // Значение меньше 1 для анимации при нажатии
+                onPress={() => noteRef.current?.focus()}
+                activeOpacity={0.7}
               >
                 <Ionicons name="document-text-outline" size={24} color="#4B5563" />
                 <View style={styles.noteInputPlaceholder}>
                   <Text style={styles.noteInputLabel}>Note</Text>
                   <TextInput
-                    ref={inputRef}
+                    ref={noteRef}
                     placeholder="Add note"
                     placeholderTextColor="#9CA3AF"
                     style={styles.input}
-                    underlineColorAndroid="transparent"
-                    selectionColor="transparent"
+                    value={note}
+                    onChangeText={setNote}
                   />
                 </View>
               </TouchableOpacity>
@@ -613,17 +318,20 @@ const TransactionAdd = () => {
               <TouchableOpacity
                 style={styles.paymentMethodInner}
                 onPress={() => setModalVisible(true)}
-                activeOpacity={0.3}
+                activeOpacity={0.7}
               >
                 <Ionicons name="card-outline" size={24} color="#4B5563" />
                 <View style={styles.noteInputPlaceholder}>
                   <Text style={styles.noteInputLabel}>Payment Method</Text>
-                  <Text style={[styles.noteText, selectedMethod && styles.selectedText]}>
-                    {selectedMethod ? (selectedMethod === 'cash' ? 'Cash' : 'Card') : 'Select...'}
+                  <Text style={styles.noteText}>
+                    {selectedMethod
+                      ? selectedMethod === "cash"
+                        ? "Cash"
+                        : "Card"
+                      : "Select..."}
                   </Text>
                 </View>
               </TouchableOpacity>
-
               <Modal
                 transparent
                 visible={modalVisible}
@@ -632,10 +340,10 @@ const TransactionAdd = () => {
               >
                 <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
                   <View style={styles.modalContainer}>
-                    <Pressable style={styles.modalOption} onPress={() => handleSelect('cash')}>
+                    <Pressable style={styles.modalOption} onPress={() => handleMethodSelect("cash")}>
                       <Text style={styles.modalText}>Cash</Text>
                     </Pressable>
-                    <Pressable style={styles.modalOption} onPress={() => handleSelect('card')}>
+                    <Pressable style={styles.modalOption} onPress={() => handleMethodSelect("card")}>
                       <Text style={styles.modalText}>Card</Text>
                     </Pressable>
                   </View>
@@ -649,12 +357,13 @@ const TransactionAdd = () => {
                   styles.recurringTransactionInner,
                   isRecurring && styles.recurringTransactionActive,
                 ]}
-                onPress={() => setIsRecurring(!isRecurring)}
+                onPress={() => setIsRecurring((prev) => !prev)}
+                activeOpacity={0.7}
               >
                 <Ionicons
                   name="repeat"
                   size={24}
-                  color={isRecurring ? "#FFFFFF" : "#4B5563"}
+                  color={isRecurring ? "#fff" : "#4B5563"}
                 />
                 <View style={styles.recurringContent}>
                   <Text
@@ -670,13 +379,8 @@ const TransactionAdd = () => {
             </View>
 
             <View style={styles.receiptePhoto}>
-              <TouchableOpacity
-                style={styles.receiptePhotoInner}>
-                <Ionicons
-                  name="image-outline"
-                  size={24}
-                  color="#4B5563"
-                />
+              <TouchableOpacity style={styles.receiptePhotoInner}>
+                <Ionicons name="image-outline" size={24} color="#4B5563" />
                 <View style={styles.receipteContent}>
                   <Text style={styles.receipteText}>Add Receipt Photo</Text>
                 </View>
@@ -686,7 +390,11 @@ const TransactionAdd = () => {
 
           <View style={styles.save}>
             <View style={styles.saveTransaction}>
-              <TouchableOpacity style={styles.saveTransactionInner}>
+              <TouchableOpacity
+                style={styles.saveTransactionInner}
+                onPress={handleSave}
+                activeOpacity={0.7}
+              >
                 <View style={styles.saveTransactionContent}>
                   <Text style={styles.saveTransactionText}>Save Transaction</Text>
                 </View>
@@ -698,7 +406,6 @@ const TransactionAdd = () => {
     </SafeAreaView>
   );
 };
-
 const getThemedStyles = (isDark) =>
   StyleSheet.create({
     container: {

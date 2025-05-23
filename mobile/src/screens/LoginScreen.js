@@ -1,3 +1,5 @@
+// src/screens/LoginScreen.js
+
 import React, { useContext, useState } from "react";
 import {
   StyleSheet,
@@ -13,7 +15,7 @@ import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_URL } from '../config';
+import { apiFetch } from "../api";  // <-- вместо API_URL
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -25,14 +27,11 @@ const LoginScreen = ({ navigation }) => {
     }
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/v1/auth/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        }
-      );
+      // теперь обращаемся через apiFetch
+      const response = await apiFetch("/api/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
 
       const rawBody = await response.text();
       console.log("HTTP", response.status, "raw body:", rawBody);
@@ -323,10 +322,8 @@ const getThemedStyles = (isDark) =>
       width: "80%",
       margin: "auto",
       flex: 1,
-      justifyContent: "space-around",
-    },
-    thirdContainer: {
-      flex: 1,
+      gap: 20,
+      marginTop: 20,
     },
     socialGroup: {
       flexDirection: "row",

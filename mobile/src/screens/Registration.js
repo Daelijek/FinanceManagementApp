@@ -1,3 +1,5 @@
+// src/screens/Registration.js
+
 import React, { useContext, useState } from "react";
 import {
   StyleSheet,
@@ -11,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
-import { API_URL } from '../config';
+import { apiFetch } from "../api";   // ← импортируем apiFetch вместо API_URL
 
 const Registration = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -28,54 +30,37 @@ const Registration = ({ navigation }) => {
     };
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/v1/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(registrationData),
-        }
-      );
+      const response = await apiFetch("/api/v1/auth/register", {
+        method: "POST",
+        body: JSON.stringify(registrationData),
+      });
 
-      // Always try to read the text first
       const responseText = await response.text();
 
-      // Only log the response in development environments
       if (__DEV__) {
         console.log("Server response:", responseText);
       }
 
       if (response.ok) {
-        // Try to parse the text as JSON, but don't fail if it's not valid JSON
         try {
-          const data = JSON.parse(responseText);
-          // Success handling
-        } catch (parseError) {
-          // Not JSON, but still success
+          JSON.parse(responseText);
+        } catch {
+          // не JSON, но всё равно успех
         }
-
-        // Proceed to login screen regardless of response format
         navigation.navigate("Login");
       } else {
-        // Only log errors in development environments
         if (__DEV__) {
           console.log("Error during registration:", responseText);
         }
-
-        // If it's the specific Internal Server Error we know about, but the data is
-        // still being saved, we can proceed to login anyway
         if (responseText.includes("Internal Server Error")) {
-          // Check if email is valid format (simple validation)
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (emailRegex.test(email) && password && password === confirmPassword) {
-            // Quietly handle this special case without logging
             alert("Registration successful! Please log in with your credentials.");
             navigation.navigate("Login");
           }
         }
       }
     } catch (error) {
-      // Always log network errors as these are important
       console.error("Network or other error during registration:", error);
     }
   };
@@ -116,8 +101,7 @@ const Registration = ({ navigation }) => {
             <TextInput
               {...commonInputProps}
               placeholder="Enter your full name"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              value={fullName}
               onChangeText={setFullName}
               aria-labelledby="labelFullName"
               left={<TextInput.Icon icon="account-outline" color="gray" />}
@@ -141,8 +125,7 @@ const Registration = ({ navigation }) => {
             <TextInput
               {...commonInputProps}
               placeholder="Enter your email"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              value={email}
               onChangeText={setEmail}
               aria-labelledby="labelEmail"
               left={<TextInput.Icon icon="email-outline" color="gray" />}
@@ -165,10 +148,9 @@ const Registration = ({ navigation }) => {
             </Text>
             <TextInput
               {...commonInputProps}
-              secureTextEntry={true}
+              secureTextEntry
               placeholder="Create password"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              value={password}
               onChangeText={setPassword}
               aria-labelledby="labelPassword"
               left={<TextInput.Icon icon="lock-outline" color="gray" />}
@@ -191,10 +173,9 @@ const Registration = ({ navigation }) => {
             </Text>
             <TextInput
               {...commonInputProps}
-              secureTextEntry={true}
+              secureTextEntry
               placeholder="Confirm password"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              value={confirmPassword}
               onChangeText={setConfirmPassword}
               aria-labelledby="labelConfirmPassword"
               left={<TextInput.Icon icon="lock-check-outline" color="gray" />}

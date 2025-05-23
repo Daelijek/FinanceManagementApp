@@ -1,5 +1,6 @@
-// PersonalInformationScreen.js
-import React, { useContext, useState, useEffect } from "react";
+// src/screens/PersonalInformationScreen.js
+
+import React, { useContext, useState, useEffect, useRef } from "react";
 import {
     StyleSheet,
     Text,
@@ -20,14 +21,13 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemeContext } from "../context/ThemeContext";
-import { API_URL } from '../config';
+import { apiFetch } from "../api";
 
 const COUNTRIES = [
     { label: "United States", code: "US" },
     { label: "Kazakhstan", code: "KZ" },
     { label: "Bangladesh", code: "BD" },
 ];
-
 
 export default function PersonalInformationScreen() {
     const { theme } = useContext(ThemeContext);
@@ -46,16 +46,10 @@ export default function PersonalInformationScreen() {
     const [saving, setSaving] = useState(false);
 
     const [modalVisible, setModalVisible] = useState(false);
+
     const selectedCountry = COUNTRIES.find(c => c.code === taxResidence);
 
-    const getToken = async () => {
-        try {
-            return await AsyncStorage.getItem("token");
-        } catch (e) {
-            console.error("Ошибка при getToken:", e);
-            return null;
-        }
-    };
+    const noteRef = useRef(null);
 
     const formatDate = (d) =>
         d
@@ -69,13 +63,8 @@ export default function PersonalInformationScreen() {
     useEffect(() => {
         (async () => {
             setLoading(true);
-            const token = await getToken();
-            const url = `${API_URL}/api/v1/users/me/personal`;
-            console.log("GET personal:", url, "token:", token);
             try {
-                const res = await fetch(url, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+                const res = await apiFetch("/api/v1/users/me/personal");
                 if (!res.ok) throw new Error(`Status ${res.status}`);
                 const data = await res.json();
 
@@ -103,9 +92,6 @@ export default function PersonalInformationScreen() {
 
     const onSave = async () => {
         setSaving(true);
-        const token = await getToken();
-        const url = `${API_URL}/api/v1/users/me/personal`;
-        console.log("PUT personal:", url);
         const body = {
             full_name: fullName,
             phone_number: phone,
@@ -116,12 +102,8 @@ export default function PersonalInformationScreen() {
                 : taxResidence,
         };
         try {
-            const res = await fetch(url, {
+            const res = await apiFetch("/api/v1/users/me/personal", {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -149,8 +131,7 @@ export default function PersonalInformationScreen() {
         try {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!perm.granted) {
-                Alert.alert("Внимание", "Нужен доступ к фотогалерее");
-                return;
+                return Alert.alert("Внимание", "Нужен доступ к фотогалерее");
             }
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -167,12 +148,9 @@ export default function PersonalInformationScreen() {
             const formData = new FormData();
             formData.append("file", { uri, name, type });
 
-            const token = await getToken();
-            const url = `${API_URL}/api/v1/users/me/photo`;
-            console.log("POST photo:", url);
-            const res = await fetch(url, {
+            const res = await apiFetch("/api/v1/users/me/photo", {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
+                headers: { "Content-Type": "multipart/form-data" },
                 body: formData,
             });
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -202,11 +180,6 @@ export default function PersonalInformationScreen() {
         setTempDob(dob);
     };
 
-    const onSelectCountry = (code) => {
-        setTaxResidence(code);
-        setModalVisible(false);
-    };
-
     if (loading) {
         return (
             <View style={styles.loader}>
@@ -226,7 +199,6 @@ export default function PersonalInformationScreen() {
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Аватар */}
                 <View style={styles.avatarWrapper}>
                     <Image
                         source={
@@ -262,7 +234,6 @@ export default function PersonalInformationScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Full Name */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -284,7 +255,6 @@ export default function PersonalInformationScreen() {
                     />
                 </View>
 
-                {/* Email */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -313,7 +283,6 @@ export default function PersonalInformationScreen() {
                     </View>
                 </View>
 
-                {/* Phone Number */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -339,7 +308,6 @@ export default function PersonalInformationScreen() {
                     </View>
                 </View>
 
-                {/* Date of Birth */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -401,7 +369,7 @@ export default function PersonalInformationScreen() {
                             </View>
                         ) : (
                             <DateTimePicker
-                                value={dob || new Date()}
+                                value={dob}
                                 mode="date"
                                 display="default"
                                 onChange={onChangeDob}
@@ -409,7 +377,6 @@ export default function PersonalInformationScreen() {
                         ))}
                 </View>
 
-                {/* Address */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -433,7 +400,6 @@ export default function PersonalInformationScreen() {
                     />
                 </View>
 
-                {/* Tax Residence */}
                 <View style={styles.field}>
                     <Text
                         style={[
@@ -459,7 +425,9 @@ export default function PersonalInformationScreen() {
                                 isDark ? styles.inputTextDark : styles.inputTextLight,
                             ]}
                         >
-                            {selectedCountry ? `${selectedCountry.label} (${selectedCountry.code})` : "Select Country"}
+                            {selectedCountry
+                                ? `${selectedCountry.label} (${selectedCountry.code})`
+                                : "Select Country"}
                         </Text>
                         <Ionicons
                             name="chevron-forward"
@@ -469,7 +437,6 @@ export default function PersonalInformationScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Save Changes */}
                 <TouchableOpacity
                     style={[
                         styles.saveButton,
@@ -486,7 +453,6 @@ export default function PersonalInformationScreen() {
                     )}
                 </TouchableOpacity>
 
-                {/* Modal выбора страны */}
                 <Modal transparent visible={modalVisible} animationType="fade">
                     <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
                         <View style={styles.modalContainer}>

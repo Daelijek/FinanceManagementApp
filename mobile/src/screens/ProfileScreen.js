@@ -17,6 +17,7 @@ const ProfileScreen = ({ navigation }) => {
   const onAppSettings = () => navigation.navigate("App Settings")
   const onPersonalInformation = () => navigation.navigate("Personal Information")
   const onBudgetCategories = () => navigation.navigate("Budget Categories")
+  const onNotifications = () => navigation.navigate("Notifications")
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
@@ -115,7 +116,7 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity onPress={onNotifications} style={styles.settingItem}>
               <View style={styles.itemGroup}>
                 <Ionicons
                   name="notifications-outline"

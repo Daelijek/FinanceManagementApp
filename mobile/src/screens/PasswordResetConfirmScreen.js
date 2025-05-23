@@ -1,3 +1,5 @@
+// src/screens/PasswordResetConfirmScreen.js
+
 import React, { useContext, useState } from "react";
 import {
     StyleSheet,
@@ -11,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
-import { API_URL } from '../config';
+import { apiFetch } from "../api";
 
 const PasswordResetConfirmScreen = ({ navigation, route }) => {
     const { email } = route.params || {};
@@ -28,18 +30,14 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
             return Alert.alert("Ошибка", "Пожалуйста, заполните все поля.");
         }
         try {
-            const response = await fetch(
-                `${API_URL}/api/v1/auth/password-reset/confirm`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        token,
-                        new_password: newPassword,
-                        confirm_password: confirmPassword,
-                    }),
-                }
-            );
+            const response = await apiFetch("/api/v1/auth/password-reset/confirm", {
+                method: "POST",
+                body: JSON.stringify({
+                    token,
+                    new_password: newPassword,
+                    confirm_password: confirmPassword,
+                }),
+            });
             const raw = await response.text();
             let data = null;
             try { data = JSON.parse(raw); } catch { }
@@ -47,7 +45,6 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
                 Alert.alert("Успех", "Пароль успешно сброшен.");
                 return navigation.navigate("Login");
             }
-            // Ошибка валидации
             const detail = data?.detail;
             let msg = "";
             if (Array.isArray(detail)) {
@@ -67,7 +64,7 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
     const commonInputProps = {
         mode: "outlined",
         outlineColor: isDark ? "#374151" : "#E5E7EB",
-        activeOutlineColor: isDark ? "#2563EB" : "#2563EB",
+        activeOutlineColor: "#2563EB",
         textColor: isDark ? "#F9FAFB" : "#000000",
         placeholderTextColor: isDark ? "#9CA3AF" : "#6B7280",
         theme: { roundness: 12 },
@@ -131,11 +128,13 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
+
             <View style={styles.footer}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.signUpButton}>← Back to Password Recovery</Text>
                 </TouchableOpacity>
             </View>
+
             <StatusBar style="auto" />
         </SafeAreaView>
     );

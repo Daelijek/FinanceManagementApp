@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -6,240 +6,679 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  Animated,
+  Easing,
+  Alert,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemeContext } from "../context/ThemeContext";
 import Svg, { G, Circle } from "react-native-svg";
-
-const data = [
-  { label: "Shopping", value: 237.49, color: "#4F46E5" }, // синий
-  { label: "Food & Drinks", value: 50.55, color: "#EC4899" }, // розовый
-  { label: "Entertainment", value: 15.99, color: "#8B5CF6" }, // фиолетовый
-  { label: "Transport", value: 52.3, color: "#10B981" }, // зеленый
-];
-
-const transactions = [
-  { id: 1, name: 'Grocery Store', date: 'Today, 2:30 PM', amount: -82.50, iconName: 'cart' },
-  { id: 2, name: 'Netflix', date: 'Yesterday', amount: -15.99, iconName: 'game-controller' },
-  { id: 3, name: 'Starbucks', date: 'Yesterday', amount: -4.75, iconName: 'cafe' },
-  { id: 4, name: 'Salary Deposit', date: 'Jan 25, 2024', amount: 3200.00, iconName: 'wallet' },
-  { id: 5, name: 'Amazon', date: 'Jan 24, 2024', amount: -129.99, iconName: 'bag' },
-  { id: 6, name: 'Restaurant', date: 'Jan 24, 2024', amount: -45.80, iconName: 'restaurant' },
-  { id: 7, name: 'Gas Station', date: 'Jan 23, 2024', amount: -52.30, iconName: 'car' },
-  { id: 8, name: 'Gift Shop', date: 'Jan 23, 2024', amount: -25.00, iconName: 'gift' },
-];
+import { apiFetch } from "../api";
+import { API_URL } from "../config";
+import { useFocusEffect } from '@react-navigation/native';
 
 const radius = 50;
 const strokeWidth = 25;
 const circumference = 2 * Math.PI * radius;
 
+const tabs = ["All", "Income", "Expenses"];
+
+const IconCmp = (iconName) =>
+  iconName && iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
+
 const TransactionScreen = () => {
-  const tabs = ["All", "Income", "Expenses", "Transfers"];
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
+  const [searchText, setSearchText] = useState("");
 
   const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState({
+    total_income: 0,
+    total_expense: 0,
+    net_balance: 0,
+  });
 
-  // Вычисляем суммарное значение
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
-  // Для каждого сегмента считаем параметры рисования
-  let cumulativePercent = 0;
-  const arcs = data.map((item) => {
-    const percent = item.value / total;
-    const strokeDasharray = circumference * percent + " " + circumference;
-    const strokeDashoffset = circumference * (1 - cumulativePercent - percent);
-    cumulativePercent += percent;
-    return {
-      ...item,
-      strokeDasharray,
-      strokeDashoffset,
+  const slideAnim = React.useRef(new Animated.Value(0)).current;
+
+  // Поля редактирования
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = useState("cash");
+  const [editIsRecurring, setEditIsRecurring] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const getCurrentMonthPeriod = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, "0");
+    return { start: `${year}-${month}-01`, end: `${year}-${month}-31` };
+  };
+
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const response = await apiFetch(`/api/v1/transactions/?limit=1000`);
+      const json = await response.json();
+      setTransactions(json.transactions || []);
+      setSummary(json.summary || {
+        total_income: 0,
+        total_expense: 0,
+        net_balance: 0,
+      });
+    } catch (error) {
+      console.error("Ошибка при загрузке транзакций:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTransactions();
+    }, [])
+  );
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const openModal = (transaction) => {
+    setSelectedTransaction(transaction);
+    setEditDescription(transaction.description || "");
+    setEditAmount(String(transaction.amount));
+    setEditPaymentMethod(transaction.payment_method || "cash");
+    setEditIsRecurring(!!transaction.is_recurring);
+    setModalVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
+      setModalVisible(false);
+      setSelectedTransaction(null);
+      setSaving(false);
+      setDeleting(false);
+    });
+  };
+
+  const onSave = async () => {
+    if (!selectedTransaction) return;
+    if (!editDescription.trim()) {
+      Alert.alert("Ошибка", "Описание не может быть пустым");
+      return;
+    }
+    const amountNum = parseFloat(editAmount);
+    if (isNaN(amountNum)) {
+      Alert.alert("Ошибка", "Введите корректную сумму");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        description: editDescription,
+        amount: amountNum,
+        payment_method: editPaymentMethod,
+        is_recurring: editIsRecurring,
+        transaction_type: selectedTransaction.transaction_type,
+        transaction_date: selectedTransaction.transaction_date,
+        category_id: selectedTransaction.category_id,
+        note: selectedTransaction.note || "",
+      };
+
+      const token = await AsyncStorage.getItem("token");
+
+      const res = await fetch(`${API_URL}/api/v1/transactions/${selectedTransaction.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при сохранении");
+      }
+
+      await fetchTransactions();
+      closeModal();
+    } catch (error) {
+      Alert.alert("Ошибка", error.message);
+      setSaving(false);
+    }
+  };
+
+  const onDelete = async () => {
+    if (!selectedTransaction) return;
+    Alert.alert(
+      "Удалить транзакцию?",
+      "Вы уверены, что хотите удалить эту транзакцию?",
+      [
+        { text: "Отмена", style: "cancel" },
+        {
+          text: "Удалить",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              const token = await AsyncStorage.getItem("token");
+
+              const res = await fetch(`${API_URL}/api/v1/transactions/${selectedTransaction.id}`, {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!res.ok) {
+                const errJson = await res.json();
+                throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при удалении");
+              }
+              await fetchTransactions();
+              closeModal();
+            } catch (error) {
+              Alert.alert("Ошибка", error.message);
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const filteredTransactions = transactions.filter((tx) => {
+    if (activeTab === "All") {
+      return tx.description.toLowerCase().includes(searchText.trim().toLowerCase());
+    }
+
+    // Маппинг вкладки на значение в transaction_type
+    const tabTypeMap = {
+      Income: "income",
+      Expenses: "expense",
     };
+
+    const expectedType = tabTypeMap[activeTab];
+    if (!expectedType) return false;
+
+    const matchesTab = tx.transaction_type.toLowerCase() === expectedType;
+    const matchesSearch = tx.description.toLowerCase().includes(searchText.trim().toLowerCase());
+
+    return matchesTab && matchesSearch;
+  });
+
+  const expenseDataMap = {};
+  transactions.forEach((tx) => {
+    if (tx.transaction_type === "expense") {
+      if (!expenseDataMap[tx.category_id]) {
+        expenseDataMap[tx.category_id] = {
+          label: tx.category_name,
+          value: 0,
+          color: tx.category_color || "#000000",
+          iconName: tx.category_icon || "cart",
+        };
+      }
+      expenseDataMap[tx.category_id].value += Math.abs(tx.amount);
+    }
+  });
+
+  const expenseData = Object.values(expenseDataMap);
+  const totalExpense = expenseData.reduce((sum, item) => sum + item.value, 0);
+
+  let accumulatedAngle = 0;
+  const arcs = expenseData.map((item) => {
+    const percentage = totalExpense > 0 ? item.value / totalExpense : 0;
+    const arcLength = percentage * circumference;
+
+    const arc = {
+      ...item,
+      percentage,
+      strokeDasharray: `${arcLength} ${circumference}`,
+      strokeDashoffset: -accumulatedAngle, // Отрицательное смещение
+    };
+
+    accumulatedAngle += arcLength;
+    return arc;
+  });
+
+  const slideUp = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
   });
 
   return (
     <SafeAreaView style={[styles.container, isDark && styles.containerDark]}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        bounces={false}
-        overScrollMode="never"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.containerInner}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.headerText, isDark && styles.headerTextDark]}>Transactions</Text>
-            <View style={styles.headerIcons}>
-              <Ionicons name="search" size={24} color={isDark ? "#D1D5DB" : "#4B5563"} />
-              <Ionicons name="filter" size={24} color={isDark ? "#D1D5DB" : "#4B5563"} />
-            </View>
-          </View>
-
-          {/* Total Balance Card */}
-          <View style={styles.totalBalance}>
-            <LinearGradient
-              colors={["#2563EB", "#3B82F6"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.balanceCardGradient}
-            >
-              <View style={styles.balanceCard}>
-                <Text style={styles.balanceTitle}>Total Balance</Text>
-                <Text style={styles.balanceAmount}>$4,285.32</Text>
-                <View style={styles.balanceGroup}>
-                  <Text style={styles.balanceReportText}>This month</Text>
-                </View>
-
-                {/* Серые "штуки" - график */}
-                <View style={styles.graphContainer}>
-                  {[20, 40, 25, 45, 30, 40, 55].map((height, index) => (
-                    <View key={index} style={[styles.graphBar, { height }]} />
-                  ))}
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.categories}>
-            <View
-              style={[
-                styles.blockOne,
-                isDark ? styles.blockOneDark : styles.blockOneLight,
-              ]}
-            >
-              <View style={styles.list}>
-                {tabs.map((tab) => {
-                  const isActive = tab === activeTab;
-                  return (
-                    <TouchableOpacity
-                      key={tab}
-                      onPress={() => setActiveTab(tab)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.itemBase,
-                          isActive
-                            ? isDark
-                              ? styles.itemActiveDark
-                              : styles.itemActiveLight
-                            : isDark
-                              ? styles.itemInactiveDark
-                              : styles.itemInactiveLight,
-                        ]}
-                      >
-                        {tab}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-
-          {/* Круговая диаграмма с легендой */}
-          <View style={styles.pieChartContainer}>
-            <View style={styles.pieChartHead}>
-              <Text style={[styles.pieChartTitle, isDark && styles.pieChartTitleDark]}>
-                Spending by Category
-              </Text>
-            </View>
-            <View style={styles.pieChartGroup}>
-              <Svg
-                width={radius * 2 + strokeWidth}
-                height={radius * 2 + strokeWidth}
-                style={{ transform: [{ rotate: "-90deg" }] }}
-              >
-                <G origin={`${radius + strokeWidth / 2}, ${radius + strokeWidth / 2}`}>
-                  <Circle
-                    cx={radius + strokeWidth / 2}
-                    cy={radius + strokeWidth / 2}
-                    r={radius}
-                    stroke={isDark ? "#374151" : "#E5E7EB"}
-                    strokeWidth={strokeWidth}
-                    fill="transparent"
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={isDark ? "#fff" : "#000"} />
+        </View>
+      ) : (
+        <>
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            bounces={false}
+            overScrollMode="never"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.containerInner}>
+              <View style={[styles.header, { alignItems: "center" }]}>
+                <Text style={[styles.headerText, isDark && styles.headerTextDark]}>
+                  Transactions
+                </Text>
+                <View style={[styles.searchContainer, isDark && styles.searchContainerDark]}>
+                  <Ionicons
+                    name="search"
+                    size={20}
+                    color={isDark ? "#D1D5DB" : "#4B5563"}
+                    style={{ marginRight: 8 }}
                   />
-                  {arcs.map((arc, index) => (
-                    <Circle
-                      key={index}
-                      cx={radius + strokeWidth / 2}
-                      cy={radius + strokeWidth / 2}
-                      r={radius}
-                      stroke={arc.color}
-                      strokeWidth={strokeWidth}
-                      strokeDasharray={arc.strokeDasharray}
-                      strokeDashoffset={arc.strokeDashoffset}
-                      fill="transparent"
-                    />
-                  ))}
-                </G>
-              </Svg>
-              <View style={styles.legend}>
-                {data.map((item, index) => (
-                  <View key={index} style={styles.legendItem}>
-                    <View
-                      style={[styles.legendColorBox, { backgroundColor: item.color }]}
-                    />
-                    <View style={styles.legendTextWrapper}>
-                      <Text style={[styles.legendLabel, isDark && styles.legendLabelDark]}>
-                        {item.label}
-                      </Text>
-                      <Text style={[styles.legendValue, isDark && styles.legendValueDark]}>
-                        $ {item.value.toFixed(2)}
-                      </Text>
+                  <TextInput
+                    style={[styles.searchInput, isDark && styles.searchInputDark]}
+                    placeholder="Search by description"
+                    placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+                    value={searchText}
+                    onChangeText={setSearchText}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    clearButtonMode="while-editing"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.totalBalance}>
+                <LinearGradient
+                  colors={["#2563EB", "#3B82F6"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.balanceCardGradient}
+                >
+                  <View style={styles.balanceCard}>
+                    <Text style={styles.balanceTitle}>Total Balance</Text>
+                    <Text
+                      style={[
+                        styles.balanceAmount,
+                        {
+                          color: summary.net_balance >= 0 ? "#22c55e" /* зеленый яркий */ : "#ef4444" /* красный яркий */,
+                        },
+                      ]}
+                    >
+                      {summary.net_balance >= 0 ? "+" : "-"} {Math.abs(summary.net_balance).toFixed(2)} $
+                    </Text>
+                    {/* <View style={styles.balanceGroup}>
+                      <Text style={styles.balanceReportText}>This month</Text>
+                    </View> */}
+
+                    <View style={styles.graphContainer}>
+                      {[20, 40, 25, 45, 30, 40, 55].map((height, index) => (
+                        <View key={index} style={[styles.graphBar, { height }]} />
+                      ))}
                     </View>
                   </View>
-                ))}
+                </LinearGradient>
               </View>
-            </View>
-          </View>
 
-          {/* Список транзакций */}
-          <View style={styles.transactionList}>
-            <View style={styles.transactionHead}>
-              <Text style={[styles.transactionTitle, isDark && styles.transactionTitleDark]}>
-                Transactions
-              </Text>
-            </View>
-            {transactions.map(({ id, name, date, amount, iconName }) => {
-              const isPositive = amount > 0;
-              return (
-                <View style={styles.transactionItem} key={id}>
-                  <View
-                    style={[
-                      styles.iconContainer,
-                      isPositive && { backgroundColor: "#DCFCE7" },
-                      isDark && !isPositive && { backgroundColor: "#1F2937" },
-                    ]}
-                  >
-                    <Ionicons
-                      name={iconName}
-                      size={24}
-                      color={isPositive ? "#16A34A" : isDark ? "#9CA3AF" : "gray"}
-                    />
+              <View style={styles.categories}>
+                <View
+                  style={[
+                    styles.blockOne,
+                    isDark ? styles.blockOneDark : styles.blockOneLight,
+                  ]}
+                >
+                  <View style={[styles.list, { justifyContent: 'space-between' }]}>
+                    {tabs.map((tab) => {
+                      const isActive = tab === activeTab;
+                      return (
+                        <TouchableOpacity
+                          key={tab}
+                          onPress={() => setActiveTab(tab)}
+                          activeOpacity={0.7}
+                          style={{ flex: 1, alignItems: 'center' }} // Равномерное распределение
+                        >
+                          <Text style={[
+                            styles.itemBase,
+                            isActive
+                              ? isDark
+                                ? styles.itemActiveDark
+                                : styles.itemActiveLight
+                              : isDark
+                                ? styles.itemInactiveDark
+                                : styles.itemInactiveLight,
+                          ]}>
+                            {tab}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
-                  <View style={styles.textContainer}>
-                    <Text style={[styles.name, isDark && styles.nameDark]}>{name}</Text>
-                    <Text style={[styles.date, isDark && styles.dateDark]}>{date}</Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.amount,
-                      { color: isPositive ? "#16A34A" : isDark ? "#E5E7EB" : "#000" },
-                    ]}
-                  >
-                    {isPositive
-                      ? `+ ${amount.toFixed(2)} $`
-                      : `- ${Math.abs(amount).toFixed(2)} $`}
+                </View>
+              </View>
+
+              <View style={styles.pieChartContainer}>
+                <View style={styles.pieChartHead}>
+                  <Text style={[styles.pieChartTitle, isDark && styles.pieChartTitleDark]}>
+                    Spending by Category
                   </Text>
                 </View>
-              );
-            })}
-          </View>
-        </View>
-      </ScrollView>
+                <View style={styles.pieChartGroup}>
+                  <Svg
+                    width={radius * 2 + strokeWidth}
+                    height={radius * 2 + strokeWidth}
+                    style={{ transform: [{ rotate: "-90deg" }] }}
+                  >
+                    <G origin={`${radius + strokeWidth / 2}, ${radius + strokeWidth / 2}`}>
+                      <Circle
+                        cx={radius + strokeWidth / 2}
+                        cy={radius + strokeWidth / 2}
+                        r={radius}
+                        stroke={isDark ? "#374151" : "#E5E7EB"}
+                        strokeWidth={strokeWidth}
+                        fill="transparent"
+                      />
+                      {arcs.map((arc, index) => (
+                        <Circle
+                          key={index}
+                          cx={radius + strokeWidth / 2}
+                          cy={radius + strokeWidth / 2}
+                          r={radius}
+                          stroke={arc.color}
+                          strokeWidth={strokeWidth}
+                          strokeDasharray={arc.strokeDasharray}
+                          strokeDashoffset={arc.strokeDashoffset}
+                          fill="transparent"
+                        />
+                      ))}
+                    </G>
+                  </Svg>
+                  <View style={styles.legend}>
+                    {expenseData.map((item, index) => (
+                      <View key={index} style={styles.legendItem}>
+                        <View
+                          style={[styles.legendColorBox, { backgroundColor: item.color }]}
+                        />
+                        <View style={styles.legendTextWrapper}>
+                          <Text style={[styles.legendLabel, isDark && styles.legendLabelDark]}>
+                            {item.label}
+                          </Text>
+                          <Text style={[styles.legendValue, isDark && styles.legendValueDark]}>
+                            $ {item.value} ({(item.value / totalExpense * 100).toFixed(1)}%)
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.transactionList}>
+                <View style={styles.transactionHead}>
+                  <Text style={[styles.transactionTitle, isDark && styles.transactionTitleDark]}>
+                    Transactions
+                  </Text>
+                </View>
+                {filteredTransactions.length === 0 ? (
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      marginTop: 20,
+                      color: isDark ? "#D1D5DB" : "#4B5563",
+                    }}
+                  >
+                    No transactions found.
+                  </Text>
+                ) : (
+                  filteredTransactions.map(
+                    ({
+                      id,
+                      description,
+                      transaction_date,
+                      amount,
+                      category_icon,
+                      category_color,
+                      transaction_type,
+                      payment_method,
+                      is_recurring,
+                      category_id,
+                      note,
+                    }) => {
+                      const isIncome = transaction_type === "income";
+                      const isExpense = transaction_type === "expense";
+
+                      let displayAmount = "";
+                      if (isIncome) {
+                        displayAmount = `+ ${amount.toFixed(2)} $`;
+                      } else if (isExpense) {
+                        displayAmount = `- ${Math.abs(amount).toFixed(2)} $`;
+                      } else {
+                        displayAmount = amount >= 0 ? `+ ${amount.toFixed(2)} $` : `- ${Math.abs(amount).toFixed(2)} $`;
+                      }
+
+                      const colorAmount = isIncome
+                        ? "#16A34A"
+                        : isExpense
+                          ? (isDark ? "#E5E7EB" : "#000")
+                          : (isDark ? "#E5E7EB" : "#000");
+
+                      const Icon = IconCmp(category_icon);
+
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          onPress={() => openModal({
+                            id,
+                            description,
+                            transaction_date,
+                            amount,
+                            category_icon,
+                            category_color,
+                            transaction_type,
+                            payment_method,
+                            is_recurring,
+                            category_id,
+                            note,
+                          })}
+                          activeOpacity={0.7}
+                          style={styles.transactionItem}
+                        >
+                          <View
+                            style={[
+                              styles.iconContainer,
+                              isIncome && { backgroundColor: "#DCFCE7" },
+                              isDark && !isIncome && { backgroundColor: "#1F2937" },
+                            ]}
+                          >
+                            <Icon
+                              name={category_icon || "cart"}
+                              size={24}
+                              color={
+                                category_color ||
+                                (isIncome ? "#16A34A" : isDark ? "#9CA3AF" : "gray")
+                              }
+                            />
+                          </View>
+                          <View style={styles.textContainer}>
+                            <Text style={[styles.name, isDark && styles.nameDark]}>
+                              {description}
+                            </Text>
+                            <Text style={[styles.date, isDark && styles.dateDark]}>
+                              {new Date(transaction_date).toLocaleString()}
+                            </Text>
+                          </View>
+                          <Text style={[styles.amount, { color: colorAmount }]}>
+                            {displayAmount}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    }
+                  )
+                )}
+              </View>
+            </View>
+          </ScrollView>
+
+          <Modal
+            animationType="none"
+            transparent
+            visible={modalVisible}
+            onRequestClose={closeModal}
+          >
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={closeModal}
+              style={styles.modalOverlay}
+            >
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80} // Можно подстроить под ваш UI
+                style={{ flex: 1, justifyContent: "flex-end" }}
+              >
+                <Animated.View
+                  style={[
+                    styles.modalContent,
+                    {
+                      backgroundColor: isDark ? "#1F2937" : "#FFF",
+                      transform: [{ translateY: slideUp }],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>
+                    Edit Transaction
+                  </Text>
+
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.label, isDark && styles.labelDark]}>Description</Text>
+                    <TextInput
+                      style={[styles.input, isDark && styles.inputDark]}
+                      placeholder="Description"
+                      placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+                      value={editDescription}
+                      onChangeText={setEditDescription}
+                      editable={!saving && !deleting}
+                    />
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.label, isDark && styles.labelDark]}>Amount</Text>
+                    <TextInput
+                      style={[styles.input, isDark && styles.inputDark]}
+                      placeholder="Amount"
+                      placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
+                      value={editAmount}
+                      onChangeText={setEditAmount}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      editable={!saving && !deleting}
+                    />
+                  </View>
+
+                  <View style={[styles.formGroup, styles.horizontalGroup]}>
+                    <View style={{ flex: 1, marginRight: 12 }}>
+                      <Text style={[styles.label, isDark && styles.labelDark]}>
+                        Payment Method
+                      </Text>
+                      <View style={styles.typeSelector}>
+                        {["cash", "card"].map((method) => {
+                          const isActive = editPaymentMethod === method;
+                          return (
+                            <TouchableOpacity
+                              key={method}
+                              style={[
+                                styles.typeButton,
+                                isActive && styles.typeButtonActive,
+                                { flex: 1, marginRight: method === "cash" ? 8 : 0 },
+                              ]}
+                              onPress={() => !saving && !deleting && setEditPaymentMethod(method)}
+                              activeOpacity={0.7}
+                            >
+                              <Text
+                                style={[
+                                  styles.typeButtonText,
+                                  isActive ? styles.typeButtonTextActive : styles.typeButtonTextInactive,
+                                ]}
+                              >
+                                {method.charAt(0).toUpperCase() + method.slice(1)}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    <View
+                      style={{
+                        justifyContent: "center",
+                        alignItems: "center",
+                        flex: 1,
+                      }}
+                    >
+                      <Text style={[styles.label, isDark && styles.labelDark]}>
+                        Recurring
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => !saving && !deleting && setEditIsRecurring(!editIsRecurring)}
+                        style={[
+                          styles.recurringToggle,
+                          editIsRecurring && styles.recurringToggleActive,
+                        ]}
+                        activeOpacity={0.7}
+                      >
+                        {editIsRecurring && <Ionicons name="checkmark" size={20} color="#FFF" />}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.cancelButton]}
+                      onPress={closeModal}
+                      disabled={saving || deleting}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.deleteButton]}
+                      onPress={onDelete}
+                      disabled={saving || deleting}
+                    >
+                      {deleting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.deleteButtonText}>Delete</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.saveButton]}
+                      onPress={onSave}
+                      disabled={saving || deleting}
+                    >
+                      {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save</Text>}
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </KeyboardAvoidingView>
+            </TouchableOpacity>
+          </Modal>
+        </>
+      )}
     </SafeAreaView>
   );
 };
@@ -250,17 +689,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   containerDark: {
-    backgroundColor: "#111827", // Тёмный фон
+    backgroundColor: "#111827",
   },
   containerInner: {
     paddingHorizontal: 20,
     paddingVertical: 20,
-    display: "flex",
     flexDirection: "column",
     gap: 20,
   },
   header: {
-    display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -274,10 +711,33 @@ const styles = StyleSheet.create({
     color: "#F9FAFB",
   },
   headerIcons: {
-    display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 25,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 10,
+    minWidth: 150,
+    flex: 1,
+  },
+  searchContainerDark: {
+    backgroundColor: "#374151",
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#111827",
+    paddingVertical: 0,
+  },
+  searchInputDark: {
+    backgroundColor: "#374151",
+    color: "#F9FAFB",
   },
   balanceCardGradient: {
     borderRadius: 16,
@@ -392,7 +852,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   legendTextWrapper: {
-    display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
     width: 200,
@@ -422,6 +881,9 @@ const styles = StyleSheet.create({
   },
   transactionTitleDark: {
     color: "#F9FAFB",
+  },
+  transactionList: {
+    marginTop: 10,
   },
   transactionItem: {
     flexDirection: "row",
@@ -458,6 +920,144 @@ const styles = StyleSheet.create({
   },
   amount: {
     fontWeight: "500",
+    fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "#00000066",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    padding: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 16,
+    color: "#000",
+  },
+  modalTitleDark: {
+    color: "#F9FAFB",
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 14,
+    marginBottom: 6,
+    color: "#000",
+  },
+  labelDark: {
+    color: "#D1D5DB",
+  },
+  horizontalGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: "#000",
+    backgroundColor: "#FAFAFA",
+  },
+  inputDark: {
+    borderColor: "#374151",
+    backgroundColor: "#1F2937",
+    color: "#F9FAFB",
+  },
+  typeSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    marginHorizontal: 4,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  typeButtonActive: {
+    backgroundColor: "#2563EB",
+    borderWidth: 0,
+  },
+  typeButtonText: {
+    fontWeight: "600",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  typeButtonTextActive: {
+    color: "#FFFFFF",
+  },
+  typeButtonTextInactive: {
+    color: "#2563EB",
+  },
+  recurringToggle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 2,
+    borderColor: "#2563EB",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recurringToggleActive: {
+    backgroundColor: "#2563EB",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginHorizontal: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButton: {
+    backgroundColor: "#E5E7EB",
+  },
+  cancelButtonText: {
+    color: "#6B7280",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  saveButton: {
+    backgroundColor: "#2563EB",
+  },
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  deleteButton: {
+    backgroundColor: "#EF4444",
+  },
+  deleteButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
     fontSize: 16,
   },
 });

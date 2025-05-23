@@ -1,3 +1,5 @@
+// src/screens/BudgetCategoriesScreen.js
+
 import React, { useContext, useState, useEffect, useRef } from "react";
 import {
     StyleSheet,
@@ -12,7 +14,7 @@ import {
     ActivityIndicator,
 } from "react-native";
 import DraggableFlatList from "react-native-draggable-flatlist";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";  // ← Добавлен импорт
 import { ThemeContext } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../config";
@@ -34,6 +36,8 @@ const iconOptions = [
     "school-outline",
     "calendar-outline",
     "card-outline",
+    // если есть "piggy-bank", он выберется через MaterialCommunityIcons
+    "piggy-bank-outline",
 ];
 
 const colorOptions = [
@@ -47,9 +51,15 @@ const colorOptions = [
     "#6B7280",
 ];
 
-const IconRenderer = ({ name, color, size }) => (
-    <Ionicons name={name} size={size} color={color} />
-);
+/** Выбирает библиотеку иконок в зависимости от имени */
+const IconCmp = (iconName) =>
+    iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
+
+/** Рендерер иконки для категорий */
+const IconRenderer = ({ name, color, size }) => {
+    const Icon = IconCmp(name);
+    return <Icon name={name} size={size} color={color} />;
+};
 
 const AddCategoryModal = ({
     visible,
@@ -86,7 +96,7 @@ const AddCategoryModal = ({
 
     const handleSave = () => {
         if (!name.trim()) {
-            Alert.alert("Error", "Please enter the category name..");
+            Alert.alert("Error", "Please enter the category name.");
             return;
         }
         if (!icon) {
@@ -108,8 +118,8 @@ const AddCategoryModal = ({
         if (duplicate) {
             Alert.alert(
                 "Error",
-                `A category with a name "${name.trim()}" already exists for the type"${categoryType === "income" ? "Income" : "Expenses"
-                }".`
+                `A category "${name.trim()}" already exists for ${categoryType === "income" ? "Income" : "Expenses"
+                }.`
             );
             return;
         }

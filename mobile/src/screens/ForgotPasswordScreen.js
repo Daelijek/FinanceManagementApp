@@ -1,3 +1,5 @@
+// src/screens/ForgotPasswordScreen.js
+
 import React, { useContext, useState } from "react";
 import {
     StyleSheet,
@@ -11,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
 import { ThemeContext } from "../context/ThemeContext";
-import { API_URL } from '../config';
+import { apiFetch } from "../api";
 
 const ForgotPasswordScreen = ({ navigation }) => {
     const [email, setEmail] = useState("");
@@ -24,14 +26,10 @@ const ForgotPasswordScreen = ({ navigation }) => {
             return Alert.alert("Ошибка", "Пожалуйста, введите ваш email.");
         }
         try {
-            const response = await fetch(
-                `${API_URL}/api/v1/auth/password-reset/request`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email }),
-                }
-            );
+            const response = await apiFetch("/api/v1/auth/password-reset/request", {
+                method: "POST",
+                body: JSON.stringify({ email }),
+            });
             const raw = await response.text();
             let data = null;
             try { data = JSON.parse(raw); } catch { }
@@ -58,7 +56,6 @@ const ForgotPasswordScreen = ({ navigation }) => {
         }
     };
 
-    // Общие пропсы для всех TextInput
     const commonInputProps = {
         mode: "outlined",
         outlineColor: isDark ? "#374151" : "#E5E7EB",
