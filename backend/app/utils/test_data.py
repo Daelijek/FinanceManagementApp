@@ -119,3 +119,69 @@ async def create_test_notifications(user_id: int, db: Session, count: int = 10):
     db.commit()
 
     return notifications
+
+
+# app/utils/test_data.py (дополнение)
+from app.models.budget import Budget, BudgetPeriodEnum
+from datetime import date
+from calendar import monthrange
+
+
+async def create_test_budgets(user_id: int, db: Session, year: int = 2023, month: int = 9):
+    """Создание тестовых бюджетов для пользователя"""
+    from app.models.category import BudgetCategory, CategoryTypeEnum
+
+    # Получаем категории расходов пользователя
+    expense_categories = db.query(BudgetCategory).filter(
+        BudgetCategory.user_id == user_id,
+        BudgetCategory.category_type == CategoryTypeEnum.EXPENSE
+    ).all()
+
+    if not expense_categories:
+        return []
+
+    # Определяем период (указанный месяц)
+    start_date = date(year, month, 1)
+    _, last_day = monthrange(year, month)
+    end_date = date(year, month, last_day)
+
+    # Предопределенные суммы бюджетов
+    budget_amounts = {
+        "Housing": 1200,
+        "Food & Dining": 650,
+        "Transportation": 400,
+        "Shopping": 300,
+        "Entertainment": 200,
+        "Health Care": 150,
+        "Bills": 100,
+        "Travel": 80,
+        "Subscription": 50
+    }
+
+    budgets = []
+
+    for category in expense_categories:
+        # Определяем сумму бюджета
+        amount = budget_amounts.get(category.name, 100)
+
+        budget = Budget(
+            user_id=user_id,
+            category_id=category.id,
+            amount=amount,
+            period=BudgetPeriodEnum.MONTHLY,
+            start_date=start_date,
+            end_date=end_date,
+            is_active=True
+        )
+
+        budgets.append(budget)
+
+    # Добавляем все бюджеты в базу данных
+    db.add_all(budgets)
+    db.commit()
+
+    # Обновляем объекты из БД
+    for budget in budgets:
+        db.refresh(budget)
+
+    return budgets

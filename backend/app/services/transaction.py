@@ -49,6 +49,11 @@ class TransactionService:
         from app.services.notification import NotificationService
         await NotificationService.generate_transaction_notification(transaction.id, db)
 
+        # Проверяем бюджет, если это расходная транзакция
+        if transaction.transaction_type == CategoryTypeEnum.EXPENSE and transaction.category_id:
+            from app.services.budget import BudgetService
+            await BudgetService.check_budget_alerts(user_id, transaction.category_id, db)
+
         return transaction
 
     @staticmethod

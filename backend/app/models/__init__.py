@@ -4,5 +4,6 @@ from app.models.financial import UserProfile, FinancialData, BankAccount
 from app.models.category import BudgetCategory
 from app.models.transaction import Transaction
 from app.models.notification import Notification, NotificationTypeEnum, NotificationCategoryEnum
+from app.models.budget import Budget, BudgetPeriodEnum
 
-__all__ = ["User", "UserProfile", "FinancialData", "BankAccount", "BudgetCategory", "Transaction", "Notification", "NotificationTypeEnum", "NotificationCategoryEnum"]
+__all__ = ["User", "UserProfile", "FinancialData", "BankAccount", "BudgetCategory", "Transaction", "Notification", "NotificationTypeEnum", "NotificationCategoryEnum", "Budget", "BudgetPeriodEnum"]
