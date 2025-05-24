@@ -20,6 +20,29 @@ import { useTranslation } from "react-i18next";
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
+// Утилита для обработки ошибок API
+const handleApiError = (error, context, t) => {
+    console.error(`Error in ${context}:`, error);
+
+    let message = 'An unexpected error occurred';
+
+    if (error.message.includes('Network') || error.message.includes('Failed to fetch')) {
+        message = 'Network error. Please check your connection.';
+    } else if (error.message.includes('401')) {
+        message = 'Authentication expired. Please log in again.';
+    } else if (error.message.includes('403')) {
+        message = 'You do not have permission to perform this action.';
+    } else if (error.message.includes('404')) {
+        message = 'Resource not found.';
+    } else if (error.message.includes('500')) {
+        message = 'Server error. Please try again later.';
+    } else if (error.message) {
+        message = error.message;
+    }
+
+    Alert.alert(t('common.error'), message);
+};
+
 // Модальное окно создания бюджета
 const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }) => {
     const { t } = useTranslation();
@@ -43,33 +66,48 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
                     return res.json();
                 })
                 .then((data) => {
+                    // Фильтруем категории, исключая те, для которых уже есть бюджеты
                     const filtered = data.filter(
                         (cat) => !existingCategories.some((ec) => ec.id === cat.id)
                     );
                     setCategories(filtered);
+
+                    // Если нет доступных категорий, показываем сообщение
+                    if (filtered.length === 0) {
+                        Alert.alert(
+                            t('create_budget.all_categories_have_budgets'),
+                            t('create_budget.all_categories_subtitle'),
+                            [
+                                {
+                                    text: t('common.confirm'),
+                                    onPress: onClose
+                                }
+                            ]
+                        );
+                    }
                 })
                 .catch((err) => {
-                    Alert.alert(t("common.error"), err.message);
+                    handleApiError(err, 'load categories', t);
                 })
                 .finally(() => setLoadingCategories(false));
         } else {
+            // Reset state when modal closes
             setSelectedCategory(null);
             setBudgetAmount("");
+            setSaving(false);
         }
-    }, [visible, existingCategories, t]);
+    }, [visible, existingCategories, t, onClose]);
 
     // Получение первого и последнего дня текущего месяца в формате YYYY-MM-DD
     const getStartDate = () => {
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), 1)
-            .toISOString()
-            .split("T")[0];
+        return now.toISOString().split("T")[0]; // Текущая дата
     };
+
     const getEndDate = () => {
         const now = new Date();
-        return new Date(now.getFullYear(), now.getMonth() + 1, 0)
-            .toISOString()
-            .split("T")[0];
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        return lastDayOfMonth.toISOString().split("T")[0]; // Последний день месяца
     };
 
     const IconCmp = (iconName) =>
@@ -77,17 +115,33 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
             ? MaterialCommunityIcons
             : Ionicons;
 
+    const validateBudgetAmount = (amount) => {
+        const numAmount = parseFloat(amount);
+
+        if (isNaN(numAmount) || numAmount <= 0) {
+            return { isValid: false, message: t('create_budget.valid_amount') };
+        }
+
+        if (numAmount > 1000000) {
+            return { isValid: false, message: 'Budget amount is too large (max: $1,000,000)' };
+        }
+
+        return { isValid: true };
+    };
+
     const handleSave = async () => {
         if (!selectedCategory) {
-            Alert.alert(t("common.error"), "Please select a category");
+            Alert.alert(t("common.error"), t('create_budget.select_category'));
+            return;
+        }
+
+        const validation = validateBudgetAmount(budgetAmount);
+        if (!validation.isValid) {
+            Alert.alert(t("common.error"), validation.message);
             return;
         }
 
         const amount = parseFloat(budgetAmount);
-        if (isNaN(amount) || amount <= 0) {
-            Alert.alert(t("common.error"), "Please enter a valid amount");
-            return;
-        }
 
         setSaving(true);
         try {
@@ -95,8 +149,8 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
                 category_id: selectedCategory.id,
                 amount,
                 period: "monthly",
-                start_date: getStartDate(),
-                end_date: getEndDate(),
+                start_date: getStartDate(), // Дата создания бюджета (сегодня)
+                end_date: getEndDate(),     // Последний день текущего месяца
             };
 
             const response = await apiFetch("/api/v1/budgets/", {
@@ -106,7 +160,10 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail?.[0]?.msg || "Failed to save budget");
+                const errorMessage = errorData.detail?.[0]?.msg ||
+                    errorData.detail ||
+                    "Failed to save budget";
+                throw new Error(errorMessage);
             }
 
             const newBudgetFromApi = await response.json();
@@ -117,15 +174,17 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
                 icon: selectedCategory.icon,
                 color: selectedCategory.color,
                 budget: newBudgetFromApi.amount,
-                spent: newBudgetFromApi.spent_amount,
+                spent: newBudgetFromApi.spent_amount || 0,
                 iconBg: selectedCategory.color + "33",
                 apiId: newBudgetFromApi.id,
             };
 
             await onSave(newBudget);
             onClose();
+
+            Alert.alert(t("common.success"), t('create_budget.budget_created'));
         } catch (error) {
-            Alert.alert(t("common.error"), error.message);
+            handleApiError(error, 'create budget', t);
         } finally {
             setSaving(false);
         }
@@ -253,18 +312,35 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
         saveButtonTextDisabled: {
             color: isDark ? "#6B7280" : "#9CA3AF",
         },
+        loadingContainer: {
+            justifyContent: "center",
+            alignItems: "center",
+            paddingVertical: 40,
+        },
+        emptyContainer: {
+            alignItems: "center",
+            paddingVertical: 40,
+        },
+        emptyText: {
+            fontSize: 16,
+            color: isDark ? "#9CA3AF" : "#6B7280",
+            textAlign: "center",
+            marginTop: 16,
+        },
     });
 
     if (loadingCategories) {
         return (
             <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-                <View
-                    style={[
-                        modalStyles.modalOverlay,
-                        { justifyContent: "center", alignItems: "center" },
-                    ]}
-                >
-                    <ActivityIndicator size="large" color="#2563EB" />
+                <View style={modalStyles.modalOverlay}>
+                    <View style={modalStyles.modalContainer}>
+                        <View style={modalStyles.loadingContainer}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                            <Text style={[modalStyles.emptyText, { marginTop: 16 }]}>
+                                Loading categories...
+                            </Text>
+                        </View>
+                    </View>
                 </View>
             </Modal>
         );
@@ -275,7 +351,7 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
             <Pressable style={modalStyles.modalOverlay} onPress={onClose}>
                 <Pressable style={modalStyles.modalContainer} onPress={(e) => e.stopPropagation()}>
                     <View style={modalStyles.modalHeader}>
-                        <Text style={modalStyles.modalTitle}>Create Budget</Text>
+                        <Text style={modalStyles.modalTitle}>{t('create_budget.title')}</Text>
                         <TouchableOpacity onPress={onClose} style={modalStyles.closeButton}>
                             <Ionicons name="close" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
                         </TouchableOpacity>
@@ -283,7 +359,7 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <View style={modalStyles.amountSection}>
-                            <Text style={modalStyles.sectionTitle}>Budget Amount</Text>
+                            <Text style={modalStyles.sectionTitle}>{t('create_budget.budget_amount')}</Text>
                             <View style={modalStyles.amountContainer}>
                                 <Text style={modalStyles.currencySymbol}>$</Text>
                                 <TextInput
@@ -293,63 +369,85 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
                                     placeholder="0"
                                     placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                                     keyboardType="numeric"
+                                    maxLength={10}
                                 />
                             </View>
                         </View>
 
-                        <View>
-                            <Text style={modalStyles.sectionTitle}>Select Category</Text>
-                            <View style={modalStyles.categoriesGrid}>
-                                {categories.map((category) => {
-                                    const Icon = IconCmp(category.icon);
-                                    const isSelected = selectedCategory?.id === category.id;
-                                    return (
-                                        <TouchableOpacity
-                                            key={category.id}
-                                            style={[
-                                                modalStyles.categoryCard,
-                                                isSelected && modalStyles.categoryCardSelected,
-                                            ]}
-                                            onPress={() => setSelectedCategory(category)}
-                                        >
-                                            <View style={[modalStyles.categoryIcon, { backgroundColor: category.color + "33" }]}>
-                                                <Icon name={category.icon} size={20} color={category.color} />
-                                            </View>
-                                            <Text style={modalStyles.categoryName}>{category.name}</Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                        {categories.length === 0 ? (
+                            <View style={modalStyles.emptyContainer}>
+                                <Ionicons
+                                    name="checkmark-circle"
+                                    size={48}
+                                    color={isDark ? "#10B981" : "#10B981"}
+                                />
+                                <Text style={modalStyles.emptyText}>
+                                    {t('create_budget.all_categories_have_budgets')}
+                                </Text>
                             </View>
-                        </View>
+                        ) : (
+                            <View>
+                                <Text style={modalStyles.sectionTitle}>{t('create_budget.select_category')}</Text>
+                                <View style={modalStyles.categoriesGrid}>
+                                    {categories.map((category) => {
+                                        const Icon = IconCmp(category.icon);
+                                        const isSelected = selectedCategory?.id === category.id;
+                                        return (
+                                            <TouchableOpacity
+                                                key={category.id}
+                                                style={[
+                                                    modalStyles.categoryCard,
+                                                    isSelected && modalStyles.categoryCardSelected,
+                                                ]}
+                                                onPress={() => setSelectedCategory(category)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View style={[modalStyles.categoryIcon, { backgroundColor: category.color + "33" }]}>
+                                                    <Icon name={category.icon} size={20} color={category.color} />
+                                                </View>
+                                                <Text style={modalStyles.categoryName}>{category.name}</Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
+                                </View>
+                            </View>
+                        )}
                     </ScrollView>
 
                     <View style={modalStyles.modalButtons}>
-                        <TouchableOpacity style={[modalStyles.modalButton, modalStyles.cancelButton]} onPress={onClose}>
+                        <TouchableOpacity
+                            style={[modalStyles.modalButton, modalStyles.cancelButton]}
+                            onPress={onClose}
+                            disabled={saving}
+                        >
                             <Text style={modalStyles.cancelButtonText}>{t("common.cancel")}</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[
-                                modalStyles.modalButton,
-                                modalStyles.saveButton,
-                                (!selectedCategory || !budgetAmount) && modalStyles.saveButtonDisabled,
-                            ]}
-                            onPress={handleSave}
-                            disabled={saving || !selectedCategory || !budgetAmount}
-                        >
-                            {saving ? (
-                                <ActivityIndicator color="#FFFFFF" size="small" />
-                            ) : (
-                                <Text
-                                    style={[
-                                        modalStyles.saveButtonText,
-                                        (!selectedCategory || !budgetAmount) && modalStyles.saveButtonTextDisabled,
-                                    ]}
-                                >
-                                    {t("common.save")}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
+                        {categories.length > 0 && (
+                            <TouchableOpacity
+                                style={[
+                                    modalStyles.modalButton,
+                                    modalStyles.saveButton,
+                                    (!selectedCategory || !budgetAmount || saving) && modalStyles.saveButtonDisabled,
+                                ]}
+                                onPress={handleSave}
+                                disabled={saving || !selectedCategory || !budgetAmount}
+                                activeOpacity={0.7}
+                            >
+                                {saving ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                    <Text
+                                        style={[
+                                            modalStyles.saveButtonText,
+                                            (!selectedCategory || !budgetAmount) && modalStyles.saveButtonTextDisabled,
+                                        ]}
+                                    >
+                                        {t("common.save")}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </Pressable>
             </Pressable>
@@ -371,10 +469,10 @@ const SetBudgetScreen = ({ navigation }) => {
     const [remaining, setRemaining] = useState(0);
     const [percentage, setPercentage] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [saving, setSaving] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
 
     const [categories, setCategories] = useState([]);
+    const [updatingCategories, setUpdatingCategories] = useState(new Set());
 
     // Загрузка текущего бюджета с сервера
     useEffect(() => {
@@ -398,7 +496,7 @@ const SetBudgetScreen = ({ navigation }) => {
 
                 setCategories(categoriesFromApi);
             } catch (error) {
-                Alert.alert(t("common.error"), error.message);
+                handleApiError(error, 'fetch budget', t);
             } finally {
                 setLoading(false);
             }
@@ -422,18 +520,35 @@ const SetBudgetScreen = ({ navigation }) => {
     const updateCategoryBudget = async (categoryId, newBudgetValue) => {
         const budget = parseFloat(newBudgetValue) || 0;
 
+        // Валидация
+        if (budget < 0) {
+            Alert.alert(t('common.error'), 'Budget amount cannot be negative');
+            return;
+        }
+
+        if (budget > 1000000) {
+            Alert.alert(t('common.error'), 'Budget amount is too large (max: $1,000,000)');
+            return;
+        }
+
+        const originalCategory = categories.find((cat) => cat.id === categoryId);
+        if (!originalCategory) return;
+
         setCategories((prev) =>
             prev.map((cat) => (cat.id === categoryId ? { ...cat, budget } : cat))
         );
 
+        setUpdatingCategories(prev => new Set([...prev, categoryId]));
+
         try {
-            const category = categories.find((cat) => cat.id === categoryId);
-            if (!category || !category.apiId) return;
+            if (!originalCategory.apiId) {
+                throw new Error("Budget ID not found");
+            }
 
             const now = new Date();
-            const start_date = new Date(now.getFullYear(), now.getMonth(), 1)
-                .toISOString()
-                .split("T")[0];
+
+            // start_date остается оригинальной датой создания (не меняем)
+            // end_date всегда последний день текущего месяца
             const end_date = new Date(now.getFullYear(), now.getMonth() + 1, 0)
                 .toISOString()
                 .split("T")[0];
@@ -441,40 +556,42 @@ const SetBudgetScreen = ({ navigation }) => {
             const body = {
                 amount: budget,
                 period: "monthly",
-                start_date,
-                end_date,
+                // start_date НЕ передаем, чтобы не менять оригинальную дату создания
+                end_date, // Обновляем только end_date
                 is_active: true,
             };
 
-            const response = await apiFetch(`/api/v1/budgets/${category.apiId}`, {
+            const response = await apiFetch(`/api/v1/budgets/${originalCategory.apiId}`, {
                 method: "PUT",
                 body: JSON.stringify(body),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.detail?.[0]?.msg || "Failed to update budget");
+                const errorMessage = errorData.detail?.[0]?.msg ||
+                    errorData.detail ||
+                    "Failed to update budget";
+                throw new Error(errorMessage);
             }
-        } catch (error) {
-            Alert.alert(t("common.error"), error.message);
-        }
-    };
 
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            Alert.alert(t("common.success"), "Budget saved successfully!", [
-                {
-                    text: t("common.confirm"),
-                    onPress: () => navigation.goBack(),
-                },
-            ]);
         } catch (error) {
-            Alert.alert(t("common.error"), "Failed to save budget");
+            console.error('Error updating budget:', error);
+
+            setCategories((prev) =>
+                prev.map((cat) =>
+                    cat.id === categoryId
+                        ? { ...cat, budget: originalCategory.budget }
+                        : cat
+                )
+            );
+
+            handleApiError(error, 'update budget', t);
         } finally {
-            setSaving(false);
+            setUpdatingCategories(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(categoryId);
+                return newSet;
+            });
         }
     };
 
@@ -483,8 +600,8 @@ const SetBudgetScreen = ({ navigation }) => {
     };
 
     const handleCreateBudget = async (newBudget) => {
+        // Оптимистичное обновление - добавляем бюджет сразу
         setCategories((prev) => [...prev, newBudget]);
-        Alert.alert(t("common.success"), "Budget created successfully!");
     };
 
     if (loading) {
@@ -493,13 +610,15 @@ const SetBudgetScreen = ({ navigation }) => {
                 style={[styles.container, { justifyContent: "center", alignItems: "center" }]}
             >
                 <ActivityIndicator size="large" color="#2563EB" />
+                <Text style={[styles.loadingText, { marginTop: 16 }]}>
+                    {t('common.loading')}
+                </Text>
             </SafeAreaView>
         );
     }
 
     return (
         <SafeAreaView style={styles.container}>
-
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Monthly Budget Summary */}
                 <View style={styles.summaryCard}>
@@ -507,10 +626,10 @@ const SetBudgetScreen = ({ navigation }) => {
                         <View style={styles.percentageContainer}>
                             <Progress.Circle
                                 size={60}
-                                progress={percentage / 100}
+                                progress={Math.min(percentage / 100, 1)}
                                 showsText={true}
                                 formatText={() => `${percentage}%`}
-                                color="#2563EB"
+                                color={percentage > 90 ? "#EF4444" : "#2563EB"}
                                 unfilledColor={isDark ? "#374151" : "#F3F4F6"}
                                 borderWidth={0}
                                 thickness={6}
@@ -522,7 +641,12 @@ const SetBudgetScreen = ({ navigation }) => {
                             <Text style={styles.summaryAmount}>
                                 ${spent.toLocaleString()} / ${totalBudget.toLocaleString()}
                             </Text>
-                            <Text style={styles.summaryUsed}>{percentage}% {t("set_budget.used")}</Text>
+                            <Text style={[
+                                styles.summaryUsed,
+                                { color: percentage > 90 ? "#EF4444" : "#2563EB" }
+                            ]}>
+                                {percentage}% {t("set_budget.used")}
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -531,7 +655,7 @@ const SetBudgetScreen = ({ navigation }) => {
                 <View style={styles.categoriesSection}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>{t("set_budget.budget_categories")}</Text>
-                        <TouchableOpacity onPress={addNewCategory}>
+                        <TouchableOpacity onPress={addNewCategory} activeOpacity={0.7}>
                             <Ionicons name="add" size={24} color="#2563EB" />
                         </TouchableOpacity>
                     </View>
@@ -540,6 +664,7 @@ const SetBudgetScreen = ({ navigation }) => {
                         {categories.map((category) => {
                             const progress = category.budget > 0 ? category.spent / category.budget : 0;
                             const isOverBudget = category.spent > category.budget;
+                            const isUpdating = updatingCategories.has(category.id);
                             const Icon = IconCmp(category.icon);
 
                             return (
@@ -559,12 +684,24 @@ const SetBudgetScreen = ({ navigation }) => {
                                             <Text style={styles.categorySlash}> / </Text>
                                             <Text style={styles.categoryBudgetLabel}>$ </Text>
                                             <TextInput
-                                                style={styles.categoryBudgetInput}
+                                                style={[
+                                                    styles.categoryBudgetInput,
+                                                    isUpdating && { opacity: 0.6 }
+                                                ]}
                                                 value={category.budget.toString()}
                                                 onChangeText={(text) => updateCategoryBudget(category.id, text)}
                                                 keyboardType="numeric"
                                                 selectTextOnFocus={true}
+                                                editable={!isUpdating}
+                                                maxLength={10}
                                             />
+                                            {isUpdating && (
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color="#2563EB"
+                                                    style={{ marginLeft: 8 }}
+                                                />
+                                            )}
                                         </View>
                                     </View>
 
@@ -579,13 +716,26 @@ const SetBudgetScreen = ({ navigation }) => {
                                             borderRadius={4}
                                         />
                                     </View>
+
+                                    {isOverBudget && (
+                                        <View style={styles.overBudgetWarning}>
+                                            <Ionicons name="warning" size={16} color="#EF4444" />
+                                            <Text style={styles.overBudgetText}>
+                                                Over budget by ${(category.spent - category.budget).toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             );
                         })}
                     </View>
 
                     {/* Add New Category Button */}
-                    <TouchableOpacity style={styles.addCategoryButton} onPress={addNewCategory}>
+                    <TouchableOpacity
+                        style={styles.addCategoryButton}
+                        onPress={addNewCategory}
+                        activeOpacity={0.7}
+                    >
                         <Ionicons name="add" size={16} color="#2563EB" />
                         <Text style={styles.addCategoryText}>{t("set_budget.add_new_category")}</Text>
                     </TouchableOpacity>
@@ -608,7 +758,7 @@ const SetBudgetScreen = ({ navigation }) => {
                                         { color: remaining >= 0 ? "#10B981" : "#EF4444" },
                                     ]}
                                 >
-                                    ${Math.abs(remaining).toLocaleString()}
+                                    {remaining >= 0 ? '+' : '-'}${Math.abs(remaining).toLocaleString()}
                                 </Text>
                             </View>
 
@@ -622,8 +772,8 @@ const SetBudgetScreen = ({ navigation }) => {
 
                         <Progress.Circle
                             size={80}
-                            progress={percentage / 100}
-                            color="#2563EB"
+                            progress={Math.min(percentage / 100, 1)}
+                            color={percentage > 90 ? "#EF4444" : "#2563EB"}
                             unfilledColor={isDark ? "#374151" : "#F3F4F6"}
                             borderWidth={0}
                             thickness={8}
@@ -649,31 +799,13 @@ const getThemedStyles = (isDark) =>
             flex: 1,
             backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
         },
-        header: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingVertical: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: isDark ? "#374151" : "#E5E7EB",
-        },
-        backButton: {
-            padding: 4,
-        },
-        headerTitle: {
-            fontSize: 18,
-            fontWeight: "600",
-            color: isDark ? "#F9FAFB" : "#111827",
-        },
-        saveButton: {
-            fontSize: 16,
-            fontWeight: "500",
-            color: "#2563EB",
-        },
         content: {
             flex: 1,
             paddingHorizontal: 20,
+        },
+        loadingText: {
+            fontSize: 16,
+            color: isDark ? "#F9FAFB" : "#111827",
         },
         summaryCard: {
             backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
@@ -715,7 +847,6 @@ const getThemedStyles = (isDark) =>
         },
         summaryUsed: {
             fontSize: 14,
-            color: "#2563EB",
             fontWeight: "500",
         },
         categoriesSection: {
@@ -792,9 +923,26 @@ const getThemedStyles = (isDark) =>
             minWidth: 40,
             textAlign: "left",
             padding: 0,
+            borderBottomWidth: 1,
+            borderBottomColor: "transparent",
         },
         categoryProgress: {
             marginTop: 4,
+        },
+        overBudgetWarning: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 8,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            backgroundColor: "#FEE2E2",
+            borderRadius: 6,
+        },
+        overBudgetText: {
+            fontSize: 12,
+            color: "#EF4444",
+            fontWeight: "500",
+            marginLeft: 4,
         },
         addCategoryButton: {
             flexDirection: "row",
@@ -842,12 +990,6 @@ const getThemedStyles = (isDark) =>
             fontSize: 18,
             fontWeight: "600",
             color: isDark ? "#F9FAFB" : "#111827",
-        },
-        progressCircleContainer: {
-            position: "absolute",
-            right: 0,
-            top: "50%",
-            transform: [{ translateY: -40 }],
         },
     });
 

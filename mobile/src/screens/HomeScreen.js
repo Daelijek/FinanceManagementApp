@@ -706,6 +706,7 @@ const getThemedStyles = (isDark) =>
     },
     budgetList: {
       marginTop: 16,
+      gap: 20,
     },
     budgetItemHeader: {
       flexDirection: "row",

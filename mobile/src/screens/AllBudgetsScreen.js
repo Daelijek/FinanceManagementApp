@@ -1,6 +1,6 @@
 // src/screens/AllBudgetsScreen.js
 
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import {
     StyleSheet,
     Text,
@@ -10,14 +10,40 @@ import {
     TouchableOpacity,
     Alert,
     ActivityIndicator,
+    RefreshControl,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Progress from "react-native-progress";
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
+import { apiFetch } from "../api";
+import { useFocusEffect } from '@react-navigation/native';
 
 const IconCmp = (iconName) =>
     iconName && iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
+
+// Утилита для обработки ошибок API
+const handleApiError = (error, context, t) => {
+    console.error(`Error in ${context}:`, error);
+    
+    let message = 'An unexpected error occurred';
+    
+    if (error.message.includes('Network') || error.message.includes('Failed to fetch')) {
+        message = 'Network error. Please check your connection.';
+    } else if (error.message.includes('401')) {
+        message = 'Authentication expired. Please log in again.';
+    } else if (error.message.includes('403')) {
+        message = 'You do not have permission to perform this action.';
+    } else if (error.message.includes('404')) {
+        message = 'Budget not found.';
+    } else if (error.message.includes('500')) {
+        message = 'Server error. Please try again later.';
+    } else if (error.message) {
+        message = error.message;
+    }
+    
+    Alert.alert(t('common.error'), message);
+};
 
 const AllBudgetsScreen = ({ navigation }) => {
     const { t } = useTranslation();
@@ -25,82 +51,72 @@ const AllBudgetsScreen = ({ navigation }) => {
     const isDark = theme === "dark";
     const styles = getThemedStyles(isDark);
 
-    const [budgets, setBudgets] = useState([
-        {
-            id: 1,
-            categoryName: "Housing",
-            categoryIcon: "home",
-            categoryColor: "#8B5CF6",
-            iconBg: "#F3E8FF",
-            budgetLimit: 1500,
-            spent: 1200,
-            remaining: 300,
-            percentage: 80,
-            status: "on_track" // on_track, over_budget, warning
-        },
-        {
-            id: 2,
-            categoryName: "Food & Dining",
-            categoryIcon: "restaurant",
-            categoryColor: "#10B981",
-            iconBg: "#D1FAE5",
-            budgetLimit: 800,
-            spent: 650,
-            remaining: 150,
-            percentage: 81,
-            status: "on_track"
-        },
-        {
-            id: 3,
-            categoryName: "Transportation",
-            categoryIcon: "car",
-            categoryColor: "#F59E0B",
-            iconBg: "#FEF3C7",
-            budgetLimit: 500,
-            spent: 520,
-            remaining: -20,
-            percentage: 104,
-            status: "over_budget"
-        },
-        {
-            id: 4,
-            categoryName: "Shopping",
-            categoryIcon: "bag",
-            categoryColor: "#EC4899",
-            iconBg: "#FCE7F3",
-            budgetLimit: 400,
-            spent: 350,
-            remaining: 50,
-            percentage: 88,
-            status: "warning"
-        },
-        {
-            id: 5,
-            categoryName: "Entertainment",
-            categoryIcon: "game-controller",
-            categoryColor: "#06B6D4",
-            iconBg: "#CFFAFE",
-            budgetLimit: 300,
-            spent: 200,
-            remaining: 100,
-            percentage: 67,
-            status: "on_track"
-        },
-        {
-            id: 6,
-            categoryName: "Health & Fitness",
-            categoryIcon: "fitness",
-            categoryColor: "#EF4444",
-            iconBg: "#FEE2E2",
-            budgetLimit: 200,
-            spent: 150,
-            remaining: 50,
-            percentage: 75,
-            status: "on_track"
-        }
-    ]);
+    const [budgets, setBudgets] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [deletingBudgets, setDeletingBudgets] = useState(new Set());
 
-    const [loading, setLoading] = useState(false);
+    // Состояния для summary
+    const [totalBudgetLimit, setTotalBudgetLimit] = useState(0);
+    const [totalSpent, setTotalSpent] = useState(0);
+    const [totalRemaining, setTotalRemaining] = useState(0);
+    const [overallPercentage, setOverallPercentage] = useState(0);
+
+    const fetchBudgets = useCallback(async () => {
+        try {
+            const response = await apiFetch("/api/v1/budgets/current-month");
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Преобразуем данные в нужный формат
+            const formattedBudgets = data.budgets_by_category.map(budget => ({
+                id: budget.category_id,
+                apiId: budget.id, // Реальный ID бюджета для операций
+                categoryName: budget.category_name,
+                categoryIcon: budget.category_icon,
+                categoryColor: budget.category_color,
+                iconBg: budget.category_color ? `${budget.category_color}33` : "#ccc33",
+                budgetLimit: budget.amount,
+                spent: budget.spent_amount,
+                remaining: budget.remaining_amount,
+                percentage: Math.round(budget.usage_percentage),
+                status: getStatusFromPercentage(budget.usage_percentage),
+                period: budget.period,
+                startDate: budget.start_date,
+                endDate: budget.end_date,
+                isActive: budget.is_active,
+                createdAt: budget.created_at,
+                updatedAt: budget.updated_at,
+            }));
+
+            setBudgets(formattedBudgets);
+
+            // Обновляем summary
+            setTotalBudgetLimit(data.total_budget || 0);
+            setTotalSpent(data.spent || 0);
+            setTotalRemaining(data.remaining || 0);
+            setOverallPercentage(Math.round(data.usage_percentage || 0));
+
+        } catch (error) {
+            handleApiError(error, 'fetch budgets', t);
+            // В случае ошибки устанавливаем пустые данные
+            setBudgets([]);
+            setTotalBudgetLimit(0);
+            setTotalSpent(0);
+            setTotalRemaining(0);
+            setOverallPercentage(0);
+        }
+    }, [t]);
+
+    const getStatusFromPercentage = (percentage) => {
+        if (percentage >= 100) return "over_budget";
+        if (percentage >= 90) return "warning";
+        return "on_track";
+    };
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -128,12 +144,7 @@ const AllBudgetsScreen = ({ navigation }) => {
         }
     };
 
-    const handleEditBudget = (budgetId) => {
-        // Navigate to edit budget or show modal
-        console.log("Edit budget:", budgetId);
-    };
-
-    const handleDeleteBudget = (budgetId) => {
+    const handleDeleteBudget = (budget) => {
         Alert.alert(
             t('all_budgets.delete_budget'),
             t('all_budgets.delete_confirmation'),
@@ -142,33 +153,102 @@ const AllBudgetsScreen = ({ navigation }) => {
                 {
                     text: t('common.delete'),
                     style: "destructive",
-                    onPress: () => {
-                        setBudgets(prev => prev.filter(budget => budget.id !== budgetId));
-                    }
+                    onPress: () => deleteBudget(budget)
                 }
             ]
         );
     };
 
-    const totalBudgetLimit = budgets.reduce((sum, budget) => sum + budget.budgetLimit, 0);
-    const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0);
-    const totalRemaining = totalBudgetLimit - totalSpent;
-    const overallPercentage = totalBudgetLimit > 0 ? Math.round((totalSpent / totalBudgetLimit) * 100) : 0;
+    const deleteBudget = async (budget) => {
+        // Добавляем бюджет в список удаляемых для показа индикатора загрузки
+        setDeletingBudgets(prev => new Set([...prev, budget.apiId]));
+
+        try {
+            const response = await apiFetch(`/api/v1/budgets/${budget.apiId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Failed to delete budget');
+            }
+
+            // Удаляем бюджет из локального состояния
+            setBudgets(prev => prev.filter(b => b.apiId !== budget.apiId));
+            
+            // Обновляем summary
+            const newTotalLimit = totalBudgetLimit - budget.budgetLimit;
+            const newTotalSpent = totalSpent - budget.spent;
+            const newTotalRemaining = newTotalLimit - newTotalSpent;
+            const newPercentage = newTotalLimit > 0 ? Math.round((newTotalSpent / newTotalLimit) * 100) : 0;
+            
+            setTotalBudgetLimit(newTotalLimit);
+            setTotalSpent(newTotalSpent);
+            setTotalRemaining(newTotalRemaining);
+            setOverallPercentage(newPercentage);
+
+            Alert.alert(t('common.success'), 'Budget deleted successfully');
+            
+        } catch (error) {
+            handleApiError(error, 'delete budget', t);
+        } finally {
+            // Убираем бюджет из списка удаляемых
+            setDeletingBudgets(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(budget.apiId);
+                return newSet;
+            });
+        }
+    };
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchBudgets();
+        setRefreshing(false);
+    }, [fetchBudgets]);
+
+    // Загружаем данные при фокусе на экране
+    useFocusEffect(
+        useCallback(() => {
+            fetchBudgets();
+        }, [fetchBudgets])
+    );
+
+    useEffect(() => {
+        const loadData = async () => {
+            setLoading(true);
+            await fetchBudgets();
+            setLoading(false);
+        };
+        
+        loadData();
+    }, [fetchBudgets]);
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#2563EB" />
+                    <Text style={styles.loadingText}>{t('common.loading')}</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('all_budgets.title')}</Text>
-                <TouchableOpacity onPress={() => navigation.navigate("Set Budget")}>
-                    <Ionicons name="add" size={24} color="#2563EB" />
-                </TouchableOpacity>
-            </View>
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh}
+                        tintColor={isDark ? "#FFFFFF" : "#000000"}
+                    />
+                }
+            >
                 {/* Summary Card */}
                 <View style={styles.summaryCard}>
                     <View style={styles.summaryHeader}>
@@ -196,14 +276,14 @@ const AllBudgetsScreen = ({ navigation }) => {
                             <Text style={[styles.statAmount, {
                                 color: totalRemaining >= 0 ? "#10B981" : "#EF4444"
                             }]}>
-                                ${Math.abs(totalRemaining).toLocaleString()}
+                                {totalRemaining >= 0 ? '+' : '-'}${Math.abs(totalRemaining).toLocaleString()}
                             </Text>
                         </View>
                     </View>
 
                     <View style={styles.summaryProgress}>
                         <Progress.Bar
-                            progress={overallPercentage / 100}
+                            progress={Math.min(overallPercentage / 100, 1)}
                             width={null}
                             height={8}
                             color={overallPercentage > 90 ? "#EF4444" : "#2563EB"}
@@ -218,104 +298,110 @@ const AllBudgetsScreen = ({ navigation }) => {
                 <View style={styles.budgetsList}>
                     <Text style={styles.sectionTitle}>{t('all_budgets.all_budgets')}</Text>
 
-                    {budgets.map((budget) => {
-                        const Icon = IconCmp(budget.categoryIcon);
-                        const statusColor = getStatusColor(budget.status);
+                    {budgets.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <Ionicons name="wallet-outline" size={64} color={isDark ? "#6B7280" : "#9CA3AF"} />
+                            <Text style={styles.emptyTitle}>{t('all_budgets.no_budgets')}</Text>
+                            <Text style={styles.emptySubtitle}>{t('all_budgets.create_first_budget')}</Text>
+                            <TouchableOpacity
+                                style={styles.createButton}
+                                onPress={() => navigation.navigate("Set Budget")}
+                            >
+                                <Text style={styles.createButtonText}>{t('all_budgets.create_budget')}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        budgets.map((budget) => {
+                            const Icon = IconCmp(budget.categoryIcon);
+                            const statusColor = getStatusColor(budget.status);
+                            const isDeleting = deletingBudgets.has(budget.apiId);
 
-                        return (
-                            <View key={budget.id} style={styles.budgetItem}>
-                                <View style={styles.budgetHeader}>
-                                    <View style={styles.budgetLeft}>
-                                        <View style={[styles.categoryIcon, { backgroundColor: budget.iconBg }]}>
-                                            <Icon
-                                                name={budget.categoryIcon}
-                                                size={24}
-                                                color={budget.categoryColor}
-                                            />
+                            return (
+                                <View key={budget.apiId} style={[styles.budgetItem, isDeleting && styles.budgetItemDeleting]}>
+                                    <View style={styles.budgetHeader}>
+                                        <View style={styles.budgetLeft}>
+                                            <View style={[styles.categoryIcon, { backgroundColor: budget.iconBg }]}>
+                                                <Icon
+                                                    name={budget.categoryIcon}
+                                                    size={24}
+                                                    color={budget.categoryColor}
+                                                />
+                                            </View>
+                                            <View style={styles.budgetInfo}>
+                                                <Text style={styles.budgetName}>{budget.categoryName}</Text>
+                                                <Text style={styles.budgetAmount}>
+                                                    ${budget.spent} / ${budget.budgetLimit}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View style={styles.budgetInfo}>
-                                            <Text style={styles.budgetName}>{budget.categoryName}</Text>
-                                            <Text style={styles.budgetAmount}>
-                                                ${budget.spent} / ${budget.budgetLimit}
-                                            </Text>
+
+                                        <View style={styles.budgetRight}>
+                                            <View style={styles.budgetActions}>
+                                                <TouchableOpacity
+                                                    onPress={() => handleDeleteBudget(budget)}
+                                                    style={styles.actionButton}
+                                                    disabled={isDeleting}
+                                                >
+                                                    {isDeleting ? (
+                                                        <ActivityIndicator size="small" color="#EF4444" />
+                                                    ) : (
+                                                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                                                    )}
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <View style={styles.budgetStatus}>
+                                                <Text style={[styles.statusText, { color: statusColor }]}>
+                                                    {getStatusText(budget.status)}
+                                                </Text>
+                                                <Text style={styles.percentageSmall}>{budget.percentage}%</Text>
+                                            </View>
                                         </View>
                                     </View>
 
-                                    <View style={styles.budgetRight}>
-                                        <View style={styles.budgetActions}>
-                                            <TouchableOpacity
-                                                onPress={() => handleEditBudget(budget.id)}
-                                                style={styles.actionButton}
-                                            >
-                                                <Ionicons name="create-outline" size={20} color="#6B7280" />
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                onPress={() => handleDeleteBudget(budget.id)}
-                                                style={styles.actionButton}
-                                            >
-                                                <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                                            </TouchableOpacity>
-                                        </View>
-
-                                        <View style={styles.budgetStatus}>
-                                            <Text style={[styles.statusText, { color: statusColor }]}>
-                                                {getStatusText(budget.status)}
-                                            </Text>
-                                            <Text style={styles.percentageSmall}>{budget.percentage}%</Text>
-                                        </View>
+                                    <View style={styles.budgetProgress}>
+                                        <Progress.Bar
+                                            progress={Math.min(budget.percentage / 100, 1)}
+                                            width={null}
+                                            height={6}
+                                            color={budget.percentage > 100 ? "#EF4444" : budget.categoryColor}
+                                            unfilledColor={isDark ? "#374151" : "#F3F4F6"}
+                                            borderWidth={0}
+                                            borderRadius={3}
+                                        />
                                     </View>
-                                </View>
 
-                                <View style={styles.budgetProgress}>
-                                    <Progress.Bar
-                                        progress={Math.min(budget.percentage / 100, 1)}
-                                        width={null}
-                                        height={6}
-                                        color={budget.percentage > 100 ? "#EF4444" : budget.categoryColor}
-                                        unfilledColor={isDark ? "#374151" : "#F3F4F6"}
-                                        borderWidth={0}
-                                        borderRadius={3}
-                                    />
-                                </View>
+                                    <View style={styles.budgetDetails}>
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailLabel}>{t('all_budgets.remaining')}</Text>
+                                            <Text style={[styles.detailAmount, {
+                                                color: budget.remaining >= 0 ? "#10B981" : "#EF4444"
+                                            }]}>
+                                                {budget.remaining >= 0 ? '+' : '-'}${Math.abs(budget.remaining)}
+                                            </Text>
+                                        </View>
 
-                                <View style={styles.budgetDetails}>
-                                    <View style={styles.detailItem}>
-                                        <Text style={styles.detailLabel}>{t('all_budgets.remaining')}</Text>
-                                        <Text style={[styles.detailAmount, {
-                                            color: budget.remaining >= 0 ? "#10B981" : "#EF4444"
-                                        }]}>
-                                            ${Math.abs(budget.remaining)}
+                                        {budget.remaining < 0 && (
+                                            <View style={styles.warningBadge}>
+                                                <Ionicons name="warning" size={12} color="#EF4444" />
+                                                <Text style={styles.warningText}>
+                                                    {t('all_budgets.over_limit')}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    {/* Дополнительная информация */}
+                                    <View style={styles.budgetMeta}>
+                                        <Text style={styles.budgetMetaText}>
+                                            Period: {budget.period} • {new Date(budget.startDate).toLocaleDateString()} - {new Date(budget.endDate).toLocaleDateString()}
                                         </Text>
                                     </View>
-
-                                    {budget.remaining < 0 && (
-                                        <View style={styles.warningBadge}>
-                                            <Ionicons name="warning" size={12} color="#EF4444" />
-                                            <Text style={styles.warningText}>
-                                                {t('all_budgets.over_limit')}
-                                            </Text>
-                                        </View>
-                                    )}
                                 </View>
-                            </View>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </View>
-
-                {/* Empty State */}
-                {budgets.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Ionicons name="wallet-outline" size={64} color={isDark ? "#6B7280" : "#9CA3AF"} />
-                        <Text style={styles.emptyTitle}>{t('all_budgets.no_budgets')}</Text>
-                        <Text style={styles.emptySubtitle}>{t('all_budgets.create_first_budget')}</Text>
-                        <TouchableOpacity
-                            style={styles.createButton}
-                            onPress={() => navigation.navigate("Set Budget")}
-                        >
-                            <Text style={styles.createButtonText}>{t('all_budgets.create_budget')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -326,6 +412,16 @@ const getThemedStyles = (isDark) =>
         container: {
             flex: 1,
             backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+        },
+        loadingContainer: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+        },
+        loadingText: {
+            marginTop: 16,
+            fontSize: 16,
+            color: isDark ? "#F9FAFB" : "#111827",
         },
         header: {
             flexDirection: "row",
@@ -424,6 +520,9 @@ const getThemedStyles = (isDark) =>
             shadowRadius: 2,
             elevation: 2,
         },
+        budgetItemDeleting: {
+            opacity: 0.6,
+        },
         budgetHeader: {
             flexDirection: "row",
             justifyContent: "space-between",
@@ -487,6 +586,7 @@ const getThemedStyles = (isDark) =>
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            marginBottom: 8,
         },
         detailItem: {
             flexDirection: "row",
@@ -514,6 +614,16 @@ const getThemedStyles = (isDark) =>
             fontSize: 12,
             color: "#EF4444",
             fontWeight: "500",
+        },
+        budgetMeta: {
+            marginTop: 8,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: isDark ? "#374151" : "#F3F4F6",
+        },
+        budgetMetaText: {
+            fontSize: 12,
+            color: isDark ? "#6B7280" : "#9CA3AF",
         },
         emptyState: {
             alignItems: "center",

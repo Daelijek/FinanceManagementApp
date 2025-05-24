@@ -32,6 +32,7 @@ const BudgetScreen = ({ navigation }) => {
   const styles = getThemedStyles(isDark);
 
   const [loading, setLoading] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [budgetData, setBudgetData] = useState({
     totalBudget: 0,
@@ -55,17 +56,15 @@ const BudgetScreen = ({ navigation }) => {
   const fetchBudgetData = async () => {
     try {
       const { year, month } = getCurrentMonthYear();
-      
-      // Получаем данные о бюджете за текущий месяц
+
       const response = await apiFetch(`/api/v1/budgets/current-month`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
-      // Обновляем общие данные о бюджете
+
       setBudgetData({
         totalBudget: data.total_budget || 0,
         spent: data.spent || 0,
@@ -73,7 +72,6 @@ const BudgetScreen = ({ navigation }) => {
         percentage: data.usage_percentage || 0,
       });
 
-      // Обновляем категории бюджета
       const formattedCategories = (data.budgets_by_category || []).map(budget => ({
         id: budget.id,
         name: budget.category_name || 'Unknown',
@@ -87,13 +85,16 @@ const BudgetScreen = ({ navigation }) => {
       }));
 
       setCategories(formattedCategories);
-
-      // Генерируем инсайты на основе данных
       generateInsights(data);
 
     } catch (error) {
       console.error('Error fetching budget data:', error);
-      // В случае ошибки устанавливаем пустые данные
+
+      // Показываем ошибку только если это не первая загрузка
+      if (!isFirstLoad) {
+        Alert.alert(t('common.error'), 'Failed to load budget data');
+      }
+
       setBudgetData({
         totalBudget: 0,
         spent: 0,
@@ -102,9 +103,10 @@ const BudgetScreen = ({ navigation }) => {
       });
       setCategories([]);
       setInsights([]);
+    } finally {
+      setIsFirstLoad(false);
     }
   };
-
   // Функция для получения цвета фона иконки на основе основного цвета
   const getIconBackgroundColor = (color) => {
     const colorMap = {
@@ -123,11 +125,11 @@ const BudgetScreen = ({ navigation }) => {
   // Генерация инсайтов на основе данных бюджета
   const generateInsights = (data) => {
     const newInsights = [];
-    
+
     if (data.usage_percentage <= 80) {
       newInsights.push("You're on track with your budget");
     }
-    
+
     if (data.usage_percentage > 90) {
       newInsights.push("Warning: You're close to your budget limit");
     }
@@ -163,7 +165,7 @@ const BudgetScreen = ({ navigation }) => {
       await fetchBudgetData();
       setLoading(false);
     };
-    
+
     loadData();
   }, []);
 
@@ -196,8 +198,8 @@ const BudgetScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={isDark ? "#FFFFFF" : "#000000"}
           />
