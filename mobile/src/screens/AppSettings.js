@@ -10,9 +10,11 @@ import {
     Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 
 const AppSettings = () => {
+    const { t } = useTranslation();
     const { theme, toggleTheme } = useContext(ThemeContext);
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -27,14 +29,18 @@ const AppSettings = () => {
         <SafeAreaView style={[styles.container, isDark && { backgroundColor: "#111827" }]}>
             <ScrollView>
                 <View style={styles.screen}>
-                    <Text style={[styles.label, isDark && { color: "#9CA3AF" }]}>Display & Appearance</Text>
+                    <Text style={[styles.label, isDark && { color: "#9CA3AF" }]}>
+                        {t('settings.display_appearance')}
+                    </Text>
                     <TouchableOpacity onPress={() => setModalVisible(true)}>
                         <View style={[styles.item, { backgroundColor: isDark ? "#1F2937" : "#FFFFFF" }]}>
                             <Ionicons name="moon" size={20} color={"#2563EB"} />
                             <View>
-                                <Text style={[styles.itemText, isDark && { color: "#FFFFFF" }]}>Theme Mode</Text>
+                                <Text style={[styles.itemText, isDark && { color: "#FFFFFF" }]}>
+                                    {t('settings.theme_mode')}
+                                </Text>
                                 <Text style={[styles.subText, isDark && { color: "#9CA3AF" }]}>
-                                    {theme === "dark" ? "Dark" : "Light"}
+                                    {theme === "dark" ? t('settings.dark') : t('settings.light')}
                                 </Text>
                             </View>
                         </View>
@@ -46,10 +52,10 @@ const AppSettings = () => {
                 <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
                     <View style={styles.modalContainer}>
                         <Pressable onPress={() => handleSelectTheme("light")} style={styles.modalOption}>
-                            <Text style={styles.modalText}>Light</Text>
+                            <Text style={styles.modalText}>{t('settings.light')}</Text>
                         </Pressable>
                         <Pressable onPress={() => handleSelectTheme("dark")} style={styles.modalOption}>
-                            <Text style={styles.modalText}>Dark</Text>
+                            <Text style={styles.modalText}>{t('settings.dark')}</Text>
                         </Pressable>
                     </View>
                 </Pressable>

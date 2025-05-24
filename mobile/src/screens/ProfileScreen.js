@@ -11,10 +11,16 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
+import { useTranslation } from 'react-i18next';
 
 const ProfileScreen = ({ navigation }) => {
-  const onPrivacyPolicy = () => navigation.navigate("PrivacyPolicy")
-  const onAppSettings = () => navigation.navigate("AppSettings")
+  const { t } = useTranslation();
+  const onPrivacyPolicy = () => navigation.navigate("Privacy Policy")
+  const onAppSettings = () => navigation.navigate("App Settings")
+  const onPersonalInformation = () => navigation.navigate("Personal Information")
+  const onBudgetCategories = () => navigation.navigate("Budget Categories")
+  const onNotifications = () => navigation.navigate("Notifications")
+  const onLanguage = () => navigation.navigate("Language");
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
@@ -41,7 +47,7 @@ const ProfileScreen = ({ navigation }) => {
             />
             <Text style={styles.headerText}>Walter White</Text>
             <Text style={styles.headerLabel}>walter.white@gmail.com</Text>
-            <Text style={styles.headerRole}>Premium Member</Text>
+            <Text style={styles.headerRole}>{t('profile.premium_member')}</Text>
           </View>
         </LinearGradient>
         <View style={styles.cardsBkg}>
@@ -51,7 +57,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.cardImg}
                 source={require("../../assets/ProfileBalance.png")}
               />
-              <Text style={styles.cardText}>Balance</Text>
+              <Text style={styles.cardText}>{t('profile.balance')}</Text>
             </View>
             <Text style={styles.cardInfo}>$12,580</Text>
           </View>
@@ -62,7 +68,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.cardImg}
                 source={require("../../assets/ProfileSavings.png")}
               />
-              <Text style={styles.cardText}>Savings</Text>
+              <Text style={styles.cardText}>{t('profile.savings')}</Text>
             </View>
             <Text style={styles.cardInfo}>$2,840</Text>
           </View>
@@ -73,7 +79,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.cardImg}
                 source={require("../../assets/ProfileCredit.png")}
               />
-              <Text style={styles.cardText}>Credit Score</Text>
+              <Text style={styles.cardText}>{t('profile.credit_score')}</Text>
             </View>
             <Text style={styles.cardInfo}>785</Text>
           </View>
@@ -81,12 +87,12 @@ const ProfileScreen = ({ navigation }) => {
 
         {/* Account Settings */}
         <View style={styles.accountSettings}>
-          <Text style={styles.accountSettingsTitle}>Account Settings</Text>
+          <Text style={styles.accountSettingsTitle}>{t('profile.account_settings')}</Text>
           <View style={styles.accountSettingsGroup}>
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity onPress={onPersonalInformation} style={styles.settingItem}>
               <View style={styles.itemGroup}>
                 <Ionicons name="person-outline" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Personal Information</Text>
+                <Text style={styles.settingText}>{t('profile.personal_information')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -103,7 +109,7 @@ const ProfileScreen = ({ navigation }) => {
                   size={24}
                   color="#3B82F6"
                 />
-                <Text style={styles.settingText}>Security & Privacy</Text>
+                <Text style={styles.settingText}>{t('profile.security_privacy')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -113,14 +119,14 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingItem}>
+            <TouchableOpacity onPress={onNotifications} style={styles.settingItem}>
               <View style={styles.itemGroup}>
                 <Ionicons
                   name="notifications-outline"
                   size={24}
                   color="#3B82F6"
                 />
-                <Text style={styles.settingText}>Notifications</Text>
+                <Text style={styles.settingText}>{t('profile.notifications')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -133,7 +139,7 @@ const ProfileScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.settingBorderlessItem}>
               <View style={styles.itemGroup}>
                 <Ionicons name="card-outline" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Connected Accounts</Text>
+                <Text style={styles.settingText}>{t('profile.connected_accounts')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -147,12 +153,12 @@ const ProfileScreen = ({ navigation }) => {
 
         {/*Preferences */}
         <View style={styles.preferences}>
-          <Text style={styles.preferencesTitle}>Preferences</Text>
+          <Text style={styles.preferencesTitle}>{t('profile.preferences')}</Text>
           <View style={styles.preferencesGroup}>
             <TouchableOpacity style={styles.preferencesItem}>
               <View style={styles.itemGroup}>
                 <Ionicons name="cash-outline" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Currency</Text>
+                <Text style={styles.settingText}>{t('profile.currency')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -162,10 +168,10 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.preferencesItem}>
+            <TouchableOpacity style={styles.preferencesItem} onPress={onLanguage}>
               <View style={styles.itemGroup}>
                 <Ionicons name="language" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Language</Text>
+                <Text style={styles.settingText}>{t('profile.language')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -178,7 +184,7 @@ const ProfileScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.preferencesItem} onPress={onAppSettings}>
               <View style={styles.itemGroup}>
                 <Ionicons name="settings-outline" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>App Settings</Text>
+                <Text style={styles.settingText}>{t('profile.app_settings')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -188,14 +194,14 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.settingBorderlessItem}>
+            <TouchableOpacity onPress={onBudgetCategories} style={styles.settingBorderlessItem}>
               <View style={styles.itemGroup}>
                 <Ionicons
                   name="document-text-outline"
                   size={24}
                   color="#3B82F6"
                 />
-                <Text style={styles.settingText}>Budget Categories</Text>
+                <Text style={styles.settingText}>{t('profile.budget_categories')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -209,7 +215,7 @@ const ProfileScreen = ({ navigation }) => {
 
         {/*Support & Help */}
         <View style={styles.preferences}>
-          <Text style={styles.preferencesTitle}>Support & Help</Text>
+          <Text style={styles.preferencesTitle}>{t('profile.support_help')}</Text>
           <View style={styles.preferencesGroup}>
             <TouchableOpacity style={styles.preferencesItem}>
               <View style={styles.itemGroup}>
@@ -218,7 +224,7 @@ const ProfileScreen = ({ navigation }) => {
                   size={24}
                   color="#3B82F6"
                 />
-                <Text style={styles.settingText}>Help Center</Text>
+                <Text style={styles.settingText}>{t('profile.help_center')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -231,7 +237,7 @@ const ProfileScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.preferencesItem} onPress={onPrivacyPolicy}>
               <View style={styles.itemGroup}>
                 <Ionicons name="shield-outline" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Privacy Policy</Text>
+                <Text style={styles.settingText}>{t('privacy_policy.title')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -248,7 +254,7 @@ const ProfileScreen = ({ navigation }) => {
                   size={24}
                   color="#3B82F6"
                 />
-                <Text style={styles.settingText}>About App</Text>
+                <Text style={styles.settingText}>{t('profile.about_app')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"
@@ -259,7 +265,7 @@ const ProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
           <View style={styles.version}>
-            <Text style={styles.versionTitle}>Versoin 2.4.1</Text>
+            <Text style={styles.versionTitle}>{t('profile.version')}</Text>
           </View>
         </View>
       </ScrollView>
