@@ -3,8 +3,9 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models.user import User
-from app.schemas.user import UserUpdate
+from app.schemas.user import UserUpdate, UserPersonalInfo
 from app.utils.security import SecurityUtils
+from datetime import datetime
 
 
 class UserService:
@@ -17,6 +18,25 @@ class UserService:
     async def get_user_by_email(email: str, db: Session) -> Optional[User]:
         """Получить пользователя по email"""
         return db.query(User).filter(User.email == email).first()
+
+    @staticmethod
+    async def get_personal_info(user_id: int, db: Session) -> UserPersonalInfo:
+        """Получить персональную информацию пользователя"""
+        user = await UserService.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        return UserPersonalInfo(
+            full_name=user.full_name,
+            email=user.email,
+            phone_number=user.phone_number,
+            date_of_birth=user.date_of_birth,
+            address=user.address,
+            tax_residence=user.tax_residence
+        )
 
     @staticmethod
     async def update_user(user_id: int, user_update: UserUpdate, db: Session) -> User:
@@ -32,6 +52,9 @@ class UserService:
         update_data = user_update.dict(exclude_unset=True)
         for field, value in update_data.items():
             setattr(user, field, value)
+
+        # Обновляем время изменения
+        user.updated_at = datetime.utcnow()
 
         db.commit()
         db.refresh(user)
@@ -51,15 +74,10 @@ class UserService:
         user.is_active = False
         db.commit()
 
-        # Или жесткое удаление
-        # db.delete(user)
-        # db.commit()
-
     @staticmethod
     async def verify_email(token: str, db: Session) -> None:
         """Подтвердить email пользователя"""
         # Здесь должна быть логика проверки токена верификации
-        # В простой реализации можно использовать похожий механизм как с reset_password_token
         pass
 
     @staticmethod

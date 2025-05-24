@@ -1,4 +1,7 @@
-import React, { useContext, version } from "react";
+// src/screens/HomeScreen.js - ПОЛНАЯ ВЕРСИЯ С ПЕРЕВОДАМИ
+
+import React, { useContext, useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   StyleSheet,
   Text,
@@ -8,23 +11,251 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { BarChart } from "react-native-chart-kit";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
+import { apiFetch } from "../api";
 
 const screenWidth = Dimensions.get("window").width;
 
+const IconCmp = (iconName) =>
+  iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
+
+const formatDate = (date) => date.toISOString().slice(0, 10);
+
+const getMonthDateRange = (year, month) => {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  return { firstDay, lastDay };
+};
+
 const HomeScreen = ({ navigation }) => {
+  const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
+  const isDark = theme === "dark";
+  const styles = getThemedStyles(isDark);
+
+  const [userName, setUserName] = useState("");
+  const [recentTransactions, setRecentTransactions] = useState([]);
+  const [totalBalance, setTotalBalance] = useState(0);
+  const [previousMonthBalance, setPreviousMonthBalance] = useState(0);
+  const [balanceChange, setBalanceChange] = useState(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [loadingChart, setLoadingChart] = useState(false);
+  const [monthlyExpensesData, setMonthlyExpensesData] = useState({
+    labels: [],
+    datasets: [{ data: [] }],
+  });
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      const resTx = await apiFetch("/api/v1/transactions/?skip=0&limit=100");
+      if (!resTx.ok) throw new Error(`Status ${resTx.status}`);
+      const { transactions } = await resTx.json();
+      const sorted = transactions
+        .sort(
+          (a, b) =>
+            new Date(b.transaction_date) - new Date(a.transaction_date)
+        )
+        .slice(0, 4);
+      setRecentTransactions(sorted);
+    } catch (err) {
+      console.error("Не удалось загрузить транзакции:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const resUser = await apiFetch("/api/v1/users/me");
+        if (resUser.ok) {
+          const userData = await resUser.json();
+          setUserName(userData.full_name);
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке профиля:", error);
+      }
+    })();
+  }, []);
+
+  const fetchAllTransactionsAndCalculateBalance = useCallback(async () => {
+    let allTransactions = [];
+    let skip = 0;
+    const limit = 500;
+    let hasMore = true;
+
+    while (hasMore) {
+      const res = await apiFetch(`/api/v1/transactions/?skip=${skip}&limit=${limit}`);
+      if (!res.ok) throw new Error(`Ошибка загрузки транзакций: ${res.status}`);
+      const data = await res.json();
+
+      allTransactions = [...allTransactions, ...data.transactions];
+
+      if (data.transactions.length < limit) {
+        hasMore = false;
+      } else {
+        skip += limit;
+      }
+    }
+
+    let income = 0;
+    let expense = 0;
+    allTransactions.forEach((tx) => {
+      if (tx.transaction_type === "income") income += tx.amount;
+      else if (tx.transaction_type === "expense") expense += tx.amount;
+    });
+
+    return income - expense;
+  }, []);
+
+  const fetchExpensesForChart = useCallback(async () => {
+    setLoadingChart(true);
+    try {
+      let allExpenses = [];
+      let skip = 0;
+      const limit = 500;
+      let hasMore = true;
+
+      while (hasMore) {
+        const res = await apiFetch(`/api/v1/transactions/?transaction_type=expense&skip=${skip}&limit=${limit}`);
+        if (!res.ok) throw new Error("Ошибка загрузки транзакций");
+        const { transactions } = await res.json();
+        allExpenses = [...allExpenses, ...transactions];
+        if (transactions.length < limit) hasMore = false;
+        else skip += limit;
+      }
+
+      const monthlyTotals = {};
+      allExpenses.forEach(({ amount, transaction_date }) => {
+        const date = new Date(transaction_date);
+        const month = date.toLocaleString("en-US", { month: "short" });
+        const year = date.getFullYear();
+        const key = `${month} ${year}`;
+        monthlyTotals[key] = (monthlyTotals[key] || 0) + amount;
+      });
+
+      const sortedKeys = Object.keys(monthlyTotals).sort((a, b) => {
+        const [monthA, yearA] = a.split(" ");
+        const [monthB, yearB] = b.split(" ");
+        const dateA = new Date(`${monthA} 1, ${yearA}`);
+        const dateB = new Date(`${monthB} 1, ${yearB}`);
+        return dateA - dateB;
+      });
+
+      const last7Months = sortedKeys.slice(-7);
+
+      setMonthlyExpensesData({
+        labels: last7Months,
+        datasets: [{ data: last7Months.map((key) => monthlyTotals[key]) }],
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, []);
+
+  const fetchMonthTransactions = useCallback(async (startDate, endDate) => {
+    const adjustedEndDate = new Date(endDate);
+    adjustedEndDate.setDate(adjustedEndDate.getDate() + 1);
+
+    const url = `/api/v1/transactions/?start_date=${formatDate(startDate)}&end_date=${formatDate(adjustedEndDate)}&skip=0&limit=1000`;
+    const res = await apiFetch(url);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    return data.transactions;
+  }, []);
+
+  const fetchBalancesForComparison = useCallback(async () => {
+    try {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+
+      const { firstDay: currentMonthStart, lastDay: currentMonthEnd } =
+        getMonthDateRange(currentYear, currentMonth);
+
+      const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth();
+      const { firstDay: prevMonthStart, lastDay: prevMonthEnd } =
+        getMonthDateRange(prevYear, prevMonth);
+
+      const currentMonthTx = await fetchMonthTransactions(
+        currentMonthStart,
+        currentMonthEnd
+      );
+      const prevMonthTx = await fetchMonthTransactions(prevMonthStart, prevMonthEnd);
+
+      const calculateBalance = (transactions) => {
+        let income = 0;
+        let expense = 0;
+        transactions.forEach((tx) => {
+          if (tx.transaction_type === "income") income += tx.amount;
+          else if (tx.transaction_type === "expense") expense += tx.amount;
+        });
+        return income - expense;
+      };
+
+      const currentBalance = calculateBalance(currentMonthTx);
+      const previousBalance = calculateBalance(prevMonthTx);
+
+      setPreviousMonthBalance(previousBalance);
+
+      if (previousBalance !== 0) {
+        const changePercent =
+          ((currentBalance - previousBalance) / Math.abs(previousBalance)) * 100;
+        setBalanceChange(changePercent);
+      } else {
+        setBalanceChange(null);
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке баланса для сравнения:", error);
+      setBalanceChange(null);
+    }
+  }, [fetchMonthTransactions]);
+
+  const fetchTotalBalance = useCallback(async () => {
+    setLoadingBalance(true);
+    try {
+      const total = await fetchAllTransactionsAndCalculateBalance();
+      setTotalBalance(total);
+    } catch (error) {
+      console.error("Ошибка при загрузке общего баланса:", error);
+    } finally {
+      setLoadingBalance(false);
+    }
+  }, [fetchAllTransactionsAndCalculateBalance]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTransactions();
+      fetchBalancesForComparison();
+      fetchTotalBalance();
+      fetchExpensesForChart();
+    }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart])
+  );
+
+  useEffect(() => {
+    fetchTransactions();
+    fetchBalancesForComparison();
+    fetchTotalBalance();
+    fetchExpensesForChart();
+  }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart]);
+
   const onProfile = () => navigation.navigate("Profile");
-  const onTransactionAdd = () => navigation.navigate("TransactionAdd");
+  const onTransactionAdd = () => navigation.navigate("Transaction Add");
   const onReports = () => navigation.navigate("Reports");
   const onBudget = () => navigation.navigate("Budget");
   const onTransfer = () => navigation.navigate("Transfer");
+  const onNotifications = () => navigation.navigate("Notifications");
+  const onAllTransactions = () => navigation.navigate("All Transactions");
 
-  // Sample Budget Data
   const budgetData = [
     { category: "Shopping", spent: 820, total: 1000, color: "#2563EB" },
     { category: "Food", spent: 450, total: 600, color: "#F59E0B" },
@@ -32,30 +263,31 @@ const HomeScreen = ({ navigation }) => {
     { category: "Body-Massage", spent: 9800, total: 15000, color: "#8B5CF6" },
   ];
 
-  // Sample Expense Data
-  const monthlyExpensesData = {
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-    datasets: [
-      {
-        data: [300, 420, 280, 520, 610, 450, 380], // Example amounts
-      },
-    ],
-  };
+  const renderBalanceChange = () => {
+    if (balanceChange === null) {
+      return <Text style={styles.balanceReport}>{t('home.no_comparison')}</Text>;
+    }
+    const isPositive = balanceChange >= 0;
+    const formattedPercent = Math.abs(balanceChange).toFixed(1);
+    const color = isPositive ? "#22C55E" : "#EF4444";
+    const sign = isPositive ? "+" : "-";
 
-  const { theme } = useContext(ThemeContext);
-  const isDark = theme === "dark";
-  const styles = getThemedStyles(isDark);
+    return (
+      <Text style={[styles.balanceReport, { color }]}>
+        {sign}${Math.abs(previousMonthBalance + (balanceChange / 100) * Math.abs(previousMonthBalance)).toFixed(2)} ({sign}{formattedPercent}%)
+      </Text>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
-        bounces={false} // Отключает эффект перетягивания вверх/вниз на iOS
-        overScrollMode="never" // Отключает overscroll на Android
-        showsVerticalScrollIndicator={false} // Скрывает полосу прокрутки
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.containerInner}>
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerGroup}>
               <TouchableOpacity onPress={onProfile}>
@@ -64,9 +296,11 @@ const HomeScreen = ({ navigation }) => {
                   source={require("../../assets/walter.png")}
                 />
               </TouchableOpacity>
-              <Text style={styles.headerText}>Welcome back, Walter</Text>
+              <Text style={styles.headerText}>
+                {t('home.welcome_back')}, {userName || "User"}
+              </Text>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={onNotifications}>
               <Ionicons
                 name="notifications-outline"
                 size={24}
@@ -74,53 +308,58 @@ const HomeScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
+
           <View style={styles.totalBalance}>
             <LinearGradient
-              colors={["#2563EB", "#3B82F6"]} // Gradient colors
+              colors={["#2563EB", "#3B82F6"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.balanceCardGradient} // New style for gradient
+              style={styles.balanceCardGradient}
             >
               <View style={styles.balanceCard}>
-                <Text style={styles.balanceTitle}>Total Balance</Text>
-                <Text style={styles.balanceAmount}>$24,580.45</Text>
+                <Text style={styles.balanceTitle}>{t('home.total_balance')}</Text>
+                {loadingBalance ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.balanceAmount}>${totalBalance.toFixed(2)}</Text>
+                )}
                 <View style={styles.balanceGroup}>
                   <View style={styles.reportbkg}>
-                    <Text style={styles.balanceReport}>+$1,245 (5.2%)</Text>
+                    {loadingBalance ? null : renderBalanceChange()}
                   </View>
-                  <Text style={styles.balanceReportText}> vs last month</Text>
+                  <Text style={styles.balanceReportText}> {t('home.vs_last_month')}</Text>
                 </View>
               </View>
             </LinearGradient>
           </View>
 
-          {/* Actions */}
           <View style={styles.actions}>
-            {/* Add */}
             <TouchableOpacity onPress={onTransactionAdd}>
               <View style={styles.actionCard}>
-                <Ionicons name="add-circle-outline" size={24} color="#2563EB" />
-                <Text style={styles.actionText}>Add</Text>
+                <Ionicons
+                  name="add-circle-outline"
+                  size={24}
+                  color="#2563EB"
+                />
+                <Text style={styles.actionText}>{t('home.actions.add')}</Text>
               </View>
             </TouchableOpacity>
-
-            {/* Transfer */}
             <TouchableOpacity onPress={onTransfer}>
               <View style={styles.actionCard}>
                 <Ionicons name="card-outline" size={24} color="#2563EB" />
-                <Text style={styles.actionText}>Transfer</Text>
+                <Text style={styles.actionText}>{t('home.actions.transfer')}</Text>
               </View>
             </TouchableOpacity>
-
-            {/* Budget */}
             <TouchableOpacity onPress={onBudget}>
               <View style={styles.actionCard}>
-                <Ionicons name="pie-chart-outline" size={24} color="#2563EB" />
-                <Text style={styles.actionText}>Budget</Text>
+                <Ionicons
+                  name="pie-chart-outline"
+                  size={24}
+                  color="#2563EB"
+                />
+                <Text style={styles.actionText}>{t('home.actions.budget')}</Text>
               </View>
             </TouchableOpacity>
-
-            {/* Reports */}
             <TouchableOpacity onPress={onReports}>
               <View style={styles.actionCard}>
                 <Ionicons
@@ -128,97 +367,78 @@ const HomeScreen = ({ navigation }) => {
                   size={24}
                   color="#2563EB"
                 />
-                <Text style={styles.actionText}>Reports</Text>
+                <Text style={styles.actionText}>{t('home.actions.reports')}</Text>
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* Recent Transactions */}
           <View style={styles.recentTransactions}>
             <View style={styles.recentHeader}>
-              <Text style={styles.recentTitle}>Recent Transactions</Text>
-              <TouchableOpacity>
-                <Text style={styles.recentAll}>See all</Text>
+              <Text style={styles.recentTitle}>{t('home.recent_transactions')}</Text>
+              <TouchableOpacity onPress={onAllTransactions}>
+                <Text style={styles.recentAll}>{t('home.see_all')}</Text>
               </TouchableOpacity>
             </View>
-
             <View style={styles.recentGroup}>
-              <View style={styles.expenseCard}>
-                <View style={styles.recentCardGroup}>
-                  <View style={styles.expenseIcon}>
-                    <Ionicons name="cart" size={20} color="#4B5563" />
+              {recentTransactions.map((tx) => {
+                const isExpense = tx.transaction_type === "expense";
+                const sign = isExpense ? "-" : "+";
+                const date = new Date(tx.transaction_date).toLocaleDateString();
+                const Icon = IconCmp(tx.category_icon || "");
+                return (
+                  <View
+                    key={tx.id}
+                    style={isExpense ? styles.expenseCard : styles.incomeCard}
+                  >
+                    <View style={styles.recentCardGroup}>
+                      <View
+                        style={
+                          isExpense ? styles.expenseIcon : styles.incomeIcon
+                        }
+                      >
+                        <Icon
+                          name={tx.category_icon || "card-outline"}
+                          size={20}
+                          color={tx.category_color || "#4B5563"}
+                        />
+                      </View>
+                      <View style={styles.expenseTitle}>
+                        <Text
+                          style={
+                            isExpense ? styles.expenseText : styles.incomeText
+                          }
+                        >
+                          {tx.description}
+                        </Text>
+                        <Text style={styles.expenseDate}>{date}</Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={isExpense ? styles.expenseInfo : styles.incomeInfo}
+                    >
+                      {sign} {tx.amount.toFixed(2)}
+                    </Text>
                   </View>
-                  <View style={styles.expenseTitle}>
-                    <Text style={styles.expenseText}>Grocery Shopping</Text>
-                    <Text style={styles.expenseDate}>Today</Text>
-                  </View>
-                </View>
-                <Text style={styles.expenseInfo}>-82.45</Text>
-              </View>
-
-              <View style={styles.expenseCard}>
-                <View style={styles.recentCardGroup}>
-                  <View style={styles.expenseIcon}>
-                    <Ionicons name="car" size={20} color="#4B5563" />
-                  </View>
-                  <View style={styles.expenseTitle}>
-                    <Text style={styles.expenseText}>Car Insurance</Text>
-                    <Text style={styles.expenseDate}>Yesterday</Text>
-                  </View>
-                </View>
-                <Text style={styles.expenseInfo}>-145.00</Text>
-              </View>
-
-              <View style={styles.expenseCard}>
-                <View style={styles.recentCardGroup}>
-                  <View style={styles.expenseIcon}>
-                    <Ionicons name="restaurant" size={20} color="#4B5563" />
-                    <Image />
-                  </View>
-                  <View style={styles.expenseTitle}>
-                    <Text style={styles.expenseText}>Restaurant</Text>
-                    <Text style={styles.expenseDate}>Yesterday</Text>
-                  </View>
-                </View>
-                <Text style={styles.expenseInfo}>-35.50</Text>
-              </View>
-
-              <View style={styles.incomeCard}>
-                <View style={styles.recentCardGroup}>
-                  <View style={styles.incomeIcon}>
-                    <Ionicons name="wallet-outline" size={20} color="#16A34A" />
-                    <Image />
-                  </View>
-                  <View style={styles.incomeTitle}>
-                    <Text style={styles.incomeText}>Salary Deposit</Text>
-                    <Text style={styles.incomeDate}>Jan 25</Text>
-                  </View>
-                </View>
-                <Text style={styles.incomeInfo}>+ 3200.00</Text>
-              </View>
+                );
+              })}
             </View>
           </View>
 
-          {/* Budget Overview */}
           <View style={styles.budgetOverview}>
             <View style={styles.budgetHeader}>
-              <Text style={styles.budgetOverviewText}>Budget Overview</Text>
+              <Text style={styles.budgetOverviewText}>{t('home.budget_overview')}</Text>
             </View>
-
-            {/* Map over budgetData to show each category's progress */}
             <View style={styles.budgetList}>
               {budgetData.map((item, index) => {
                 const progress = item.spent / item.total;
                 return (
                   <View key={index} style={styles.budgetItem}>
-                    {/* Category + Amount */}
                     <View style={styles.budgetItemHeader}>
                       <Text style={styles.budgetCategory}>{item.category}</Text>
                       <Text style={styles.budgetAmount}>
                         ${item.spent} / ${item.total}
                       </Text>
                     </View>
-                    {/* Progress Bar */}
                     <Progress.Bar
                       progress={progress}
                       width={null}
@@ -234,35 +454,44 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Monthly Expenses */}
           <View style={styles.monthlyExpenses}>
             <View style={styles.expensesHeader}>
-              <Text style={styles.monthlyExpensesText}>Monthly Expenses</Text>
+              <Text style={styles.monthlyExpensesText}>{t('home.monthly_expenses')}</Text>
             </View>
 
-            {/* Bar Chart */}
-            <BarChart
-              data={monthlyExpensesData}
-              width={screenWidth - 40} // Adjust for screen padding
-              height={200}
-              yAxisLabel="$"
-              fromZero
-              showValuesOnTopOfBars
-              chartConfig={{
-                backgroundColor: "#fff",
-                backgroundGradientFrom: "#fff",
-                backgroundGradientTo: "#fff",
-                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`, // Bars color
-                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`, // Label color
-                style: {
-                  borderRadius: 16,
-                },
-              }}
-              style={{
-                marginVertical: 8,
-                borderRadius: 16,
-              }}
-            />
+            {loadingChart ? (
+              <ActivityIndicator size="large" color="#2563EB" />
+            ) : monthlyExpensesData.labels.length === 0 ? (
+              <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
+                {t('home.no_data')}
+              </Text>
+            ) : (
+              <BarChart
+                data={monthlyExpensesData}
+                width={screenWidth - 40}
+                height={200}
+                yAxisLabel="$"
+                fromZero
+                showValuesOnTopOfBars
+                chartConfig={{
+                  backgroundColor: isDark ? "#1F2937" : "#fff",
+                  backgroundGradientFrom: isDark ? "#1F2937" : "#fff",
+                  backgroundGradientTo: isDark ? "#111827" : "#fff",
+                  decimalPlaces: 2,
+                  color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+                  labelColor: (opacity = 1) =>
+                    isDark
+                      ? `rgba(255, 255, 255, ${opacity})`
+                      : `rgba(0, 0, 0, ${opacity})`,
+                  style: { borderRadius: 16 },
+                  propsForBackgroundLines: {
+                    strokeWidth: 0.5,
+                    stroke: isDark ? "#374151" : "#E5E7EB",
+                  },
+                }}
+                style={{ marginVertical: 8, borderRadius: 16 }}
+              />
+            )}
           </View>
         </View>
       </ScrollView>
@@ -420,6 +649,7 @@ const getThemedStyles = (isDark) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
+      marginBottom: 15,
     },
     incomeIcon: {
       width: 40,

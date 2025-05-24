@@ -1,3 +1,5 @@
+// src/screens/Registration.js
+
 import React, { useContext, useState } from "react";
 import {
   StyleSheet,
@@ -10,11 +12,12 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
-
-const API_URL = "https://c1fa-85-159-27-203.ngrok-free.app";
+import { apiFetch } from "../api";   // ← импортируем apiFetch вместо API_URL
 
 const Registration = ({ navigation }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -29,54 +32,37 @@ const Registration = ({ navigation }) => {
     };
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/v1/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(registrationData),
-        }
-      );
+      const response = await apiFetch("/api/v1/auth/register", {
+        method: "POST",
+        body: JSON.stringify(registrationData),
+      });
 
-      // Always try to read the text first
       const responseText = await response.text();
 
-      // Only log the response in development environments
       if (__DEV__) {
         console.log("Server response:", responseText);
       }
 
       if (response.ok) {
-        // Try to parse the text as JSON, but don't fail if it's not valid JSON
         try {
-          const data = JSON.parse(responseText);
-          // Success handling
-        } catch (parseError) {
-          // Not JSON, but still success
+          JSON.parse(responseText);
+        } catch {
+          // не JSON, но всё равно успех
         }
-
-        // Proceed to login screen regardless of response format
         navigation.navigate("Login");
       } else {
-        // Only log errors in development environments
         if (__DEV__) {
           console.log("Error during registration:", responseText);
         }
-
-        // If it's the specific Internal Server Error we know about, but the data is
-        // still being saved, we can proceed to login anyway
         if (responseText.includes("Internal Server Error")) {
-          // Check if email is valid format (simple validation)
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           if (emailRegex.test(email) && password && password === confirmPassword) {
-            // Quietly handle this special case without logging
             alert("Registration successful! Please log in with your credentials.");
             navigation.navigate("Login");
           }
         }
       }
     } catch (error) {
-      // Always log network errors as these are important
       console.error("Network or other error during registration:", error);
     }
   };
@@ -84,31 +70,39 @@ const Registration = ({ navigation }) => {
   const pressedButton = () => navigation.navigate("Login");
   const handleGoogleLogin = () => console.log("Google login pressed");
   const handleAppleLogin = () => console.log("Apple login pressed");
-  const handlePrivacyPolicy = () => navigation.navigate("PrivacyPolicy");
-
+  const handlePrivacyPolicy = () => navigation.navigate("Privacy Policy");
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
 
+  const commonInputProps = {
+    mode: "outlined",
+    outlineColor: isDark ? "#374151" : "#E5E7EB",
+    activeOutlineColor: "#2563EB",
+    textColor: isDark ? "#F9FAFB" : "#000000",
+    placeholderTextColor: "#9CA3AF",
+    style: styles.input,
+    theme: { roundness: 12 },
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Start Your Financial Journey</Text>
+        <Text style={styles.title}>{t('auth.start_journey')}</Text>
         <Text style={styles.titleLable}>
-          Join millions managing their money smarter
+          {t('auth.join_millions')}
         </Text>
 
         {/* Full Name */}
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelFullName">
-              Full Name
+              {t('auth.full_name')}
             </Text>
             <TextInput
-              mode="outlined"
-              placeholder="Enter your full name"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              {...commonInputProps}
+              placeholder={t('auth.enter_full_name')}
+              value={fullName}
               onChangeText={setFullName}
               aria-labelledby="labelFullName"
               left={<TextInput.Icon icon="account-outline" color="gray" />}
@@ -127,13 +121,12 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelEmail">
-              Email Address
+              {t('auth.email')}
             </Text>
             <TextInput
-              mode="outlined"
-              placeholder="Enter your email"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              {...commonInputProps}
+              placeholder={t('auth.enter_email')}
+              value={email}
               onChangeText={setEmail}
               aria-labelledby="labelEmail"
               left={<TextInput.Icon icon="email-outline" color="gray" />}
@@ -152,14 +145,13 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelPassword">
-              Password
+              {t('auth.password')}
             </Text>
             <TextInput
-              mode="outlined"
-              secureTextEntry={true}
-              placeholder="Create password"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              {...commonInputProps}
+              secureTextEntry
+              placeholder={t('auth.create_password')}
+              value={password}
               onChangeText={setPassword}
               aria-labelledby="labelPassword"
               left={<TextInput.Icon icon="lock-outline" color="gray" />}
@@ -178,14 +170,13 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelConfirmPassword">
-              Confirm Password
+              {t('auth.confirm_password')}
             </Text>
             <TextInput
-              mode="outlined"
-              secureTextEntry={true}
-              placeholder="Confirm password"
-              placeholderTextColor="#9CA3AF"
-              style={styles.input}
+              {...commonInputProps}
+              secureTextEntry
+              placeholder={t('auth.confirm_password_text')}
+              value={confirmPassword}
               onChangeText={setConfirmPassword}
               aria-labelledby="labelConfirmPassword"
               left={<TextInput.Icon icon="lock-check-outline" color="gray" />}
@@ -208,7 +199,7 @@ const Registration = ({ navigation }) => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.buttonTitle}>Create Account</Text>
+            <Text style={styles.buttonTitle}>{t('auth.create_account')}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -226,7 +217,7 @@ const Registration = ({ navigation }) => {
                   color: "#6B7280",
                 }}
               >
-                or continue with
+                {t('auth.continue_with')}
               </Text>
             </View>
             <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
@@ -238,7 +229,7 @@ const Registration = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/google.png")}
                 />
-                <Text style={styles.socialText}>Google</Text>
+                <Text style={styles.socialText}>{t('auth.google')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleAppleLogin} style={styles.social}>
@@ -247,7 +238,7 @@ const Registration = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/apple.png")}
                 />
-                <Text style={styles.socialText}>Apple</Text>
+                <Text style={styles.socialText}>{t('auth.apple')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -258,25 +249,25 @@ const Registration = ({ navigation }) => {
                 source={require("../../assets/security.png")}
               />
               <Text style={styles.securityText}>
-                Your data is secure with 256-bit encryption
+                {t('auth.secure_data')}
               </Text>
             </View>
           </View>
           <View style={styles.signIn}>
             <View style={styles.signInGroup}>
-              <Text style={styles.signInText}>Already have an account?</Text>
+              <Text style={styles.signInText}>{t('auth.have_account')}</Text>
               <TouchableOpacity onPress={pressedButton}>
-                <Text style={styles.signInButton}> Sign in</Text>
+                <Text style={styles.signInButton}> {t('auth.sign_in')}</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={styles.policy}>
             <View style={styles.policyGroup}>
               <Text style={styles.policyText}>
-                By signing up, you agree to our Terms of Service and{" "}
+                {t('auth.agree_terms')}{" "}
               </Text>
               <TouchableOpacity onPress={handlePrivacyPolicy}>
-                <Text style={styles.policyButton}>Privacy Policy</Text>
+                <Text style={styles.policyButton}>{t('auth.privacy_policy')}</Text>
               </TouchableOpacity>
             </View>
           </View>

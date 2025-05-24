@@ -1,12 +1,12 @@
 # app/api/v1/categories.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
 from app.database import get_db
 from app.schemas.category import (
-    CategoryCreate, CategoryUpdate, CategoryResponse,
-    CategoryWithSubcategories, SystemCategoriesResponse
+    CategoryCreate, CategoryUpdate, CategoryResponse, SystemCategoriesResponse
 )
+from app.models.category import CategoryTypeEnum
 from app.services.category import CategoryService
 from app.utils.dependencies import get_current_active_user
 from app.models.user import User
@@ -17,13 +17,33 @@ router = APIRouter(
 )
 
 
-@router.get("/", response_model=List[CategoryWithSubcategories])
+@router.get("/", response_model=Dict[str, List[CategoryResponse]])
 async def get_categories(
         current_user: User = Depends(get_current_active_user),
         db: Session = Depends(get_db)
 ):
-    """Получить все категории пользователя"""
+    """Получить все категории пользователя разделенные по типу"""
     categories = await CategoryService.get_categories(current_user.id, db)
+    return categories
+
+
+@router.get("/expense", response_model=List[CategoryResponse])
+async def get_expense_categories(
+        current_user: User = Depends(get_current_active_user),
+        db: Session = Depends(get_db)
+):
+    """Получить все категории расходов пользователя"""
+    categories = await CategoryService.get_categories_by_type(current_user.id, CategoryTypeEnum.EXPENSE, db)
+    return categories
+
+
+@router.get("/income", response_model=List[CategoryResponse])
+async def get_income_categories(
+        current_user: User = Depends(get_current_active_user),
+        db: Session = Depends(get_db)
+):
+    """Получить все категории доходов пользователя"""
+    categories = await CategoryService.get_categories_by_type(current_user.id, CategoryTypeEnum.INCOME, db)
     return categories
 
 
@@ -56,7 +76,7 @@ async def get_system_categories(
     )
 
 
-@router.get("/{category_id}", response_model=CategoryWithSubcategories)
+@router.get("/{category_id}", response_model=CategoryResponse)
 async def get_category(
         category_id: int,
         current_user: User = Depends(get_current_active_user),
