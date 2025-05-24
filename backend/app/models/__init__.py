@@ -5,5 +5,11 @@ from app.models.category import BudgetCategory
 from app.models.transaction import Transaction
 from app.models.notification import Notification, NotificationTypeEnum, NotificationCategoryEnum
 from app.models.budget import Budget, BudgetPeriodEnum
+from app.models.export import ExportedReport
 
-__all__ = ["User", "UserProfile", "FinancialData", "BankAccount", "BudgetCategory", "Transaction", "Notification", "NotificationTypeEnum", "NotificationCategoryEnum", "Budget", "BudgetPeriodEnum"]
+__all__ = [
+    "User", "UserProfile", "FinancialData", "BankAccount",
+    "BudgetCategory", "Transaction", "Notification",
+    "NotificationTypeEnum", "NotificationCategoryEnum",
+    "Budget", "BudgetPeriodEnum", "ExportedReport"
+]
