@@ -30,6 +30,7 @@ import LanguageScreen from "../screens/LanguageScreen";
 import SetBudgetScreen from "../screens/SetBudgetScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 import AllBudgetsScreen from "../screens/AllBudgetsScreen";
+import ExportReportScreen from "../screens/ExportReportScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -168,6 +169,11 @@ const AppNavigator = () => {
         options={makeBackOptions}
       />
 
+      <Stack.Screen
+        name="Export Report"
+        component={ExportReportScreen}
+        options={makeBackOptions}
+      />
     </Stack.Navigator>
   );
 };
