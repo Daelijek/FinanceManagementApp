@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.js
+// src/screens/HomeScreen.js - ПОЛНАЯ ВЕРСИЯ С ПЕРЕВОДАМИ
 
 import React, { useContext, useState, useEffect, useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -17,19 +17,17 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Progress from "react-native-progress";
 import { BarChart } from "react-native-chart-kit";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
 const screenWidth = Dimensions.get("window").width;
 
-/** Выбирает библиотеку иконок в зависимости от имени */
 const IconCmp = (iconName) =>
   iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
 
-// Вспомогательная функция для форматирования даты в yyyy-mm-dd
 const formatDate = (date) => date.toISOString().slice(0, 10);
 
-// Функция получения первого и последнего дня месяца
 const getMonthDateRange = (year, month) => {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -38,16 +36,15 @@ const getMonthDateRange = (year, month) => {
 
 const HomeScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
+  const { t } = useTranslation();
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
 
   const [userName, setUserName] = useState("");
   const [recentTransactions, setRecentTransactions] = useState([]);
-
-  const [totalBalance, setTotalBalance] = useState(0); // баланс по всем транзакциям
+  const [totalBalance, setTotalBalance] = useState(0);
   const [previousMonthBalance, setPreviousMonthBalance] = useState(0);
   const [balanceChange, setBalanceChange] = useState(null);
-
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [loadingChart, setLoadingChart] = useState(false);
   const [monthlyExpensesData, setMonthlyExpensesData] = useState({
@@ -55,7 +52,6 @@ const HomeScreen = ({ navigation }) => {
     datasets: [{ data: [] }],
   });
 
-  // Загрузка последних 4 транзакций
   const fetchTransactions = useCallback(async () => {
     try {
       const resTx = await apiFetch("/api/v1/transactions/?skip=0&limit=100");
@@ -73,7 +69,6 @@ const HomeScreen = ({ navigation }) => {
     }
   }, []);
 
-  // Загрузка профиля пользователя
   useEffect(() => {
     (async () => {
       try {
@@ -88,7 +83,6 @@ const HomeScreen = ({ navigation }) => {
     })();
   }, []);
 
-  // Функция для получения всех транзакций с пагинацией и подсчётом баланса по ним
   const fetchAllTransactionsAndCalculateBalance = useCallback(async () => {
     let allTransactions = [];
     let skip = 0;
@@ -119,7 +113,6 @@ const HomeScreen = ({ navigation }) => {
     return income - expense;
   }, []);
 
-  // Загрузка данных для графика месячных расходов
   const fetchExpensesForChart = useCallback(async () => {
     setLoadingChart(true);
     try {
@@ -167,7 +160,6 @@ const HomeScreen = ({ navigation }) => {
     }
   }, []);
 
-  // Функция загрузки транзакций текущего и предыдущего месяца для сравнения баланса
   const fetchMonthTransactions = useCallback(async (startDate, endDate) => {
     const adjustedEndDate = new Date(endDate);
     adjustedEndDate.setDate(adjustedEndDate.getDate() + 1);
@@ -240,7 +232,6 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [fetchAllTransactionsAndCalculateBalance]);
 
-  // Обновление данных при фокусе экрана
   useFocusEffect(
     useCallback(() => {
       fetchTransactions();
@@ -250,7 +241,6 @@ const HomeScreen = ({ navigation }) => {
     }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart])
   );
 
-  // Первый запуск при монтировании
   useEffect(() => {
     fetchTransactions();
     fetchBalancesForComparison();
@@ -258,7 +248,6 @@ const HomeScreen = ({ navigation }) => {
     fetchExpensesForChart();
   }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart]);
 
-  // Навигация
   const onProfile = () => navigation.navigate("Profile");
   const onTransactionAdd = () => navigation.navigate("Transaction Add");
   const onReports = () => navigation.navigate("Reports");
@@ -274,10 +263,9 @@ const HomeScreen = ({ navigation }) => {
     { category: "Body-Massage", spent: 9800, total: 15000, color: "#8B5CF6" },
   ];
 
-  // Форматируем отображение процента изменения
   const renderBalanceChange = () => {
     if (balanceChange === null) {
-      return <Text style={styles.balanceReport}>No data available for comparison</Text>;
+      return <Text style={styles.balanceReport}>{t('home.no_comparison')}</Text>;
     }
     const isPositive = balanceChange >= 0;
     const formattedPercent = Math.abs(balanceChange).toFixed(1);
@@ -300,7 +288,6 @@ const HomeScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.containerInner}>
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerGroup}>
               <TouchableOpacity onPress={onProfile}>
@@ -310,7 +297,7 @@ const HomeScreen = ({ navigation }) => {
                 />
               </TouchableOpacity>
               <Text style={styles.headerText}>
-                Welcome back, {userName || "User"}
+                {t('home.welcome_back')}, {userName || "User"}
               </Text>
             </View>
             <TouchableOpacity onPress={onNotifications}>
@@ -322,7 +309,6 @@ const HomeScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Total Balance */}
           <View style={styles.totalBalance}>
             <LinearGradient
               colors={["#2563EB", "#3B82F6"]}
@@ -331,7 +317,7 @@ const HomeScreen = ({ navigation }) => {
               style={styles.balanceCardGradient}
             >
               <View style={styles.balanceCard}>
-                <Text style={styles.balanceTitle}>Total Balance</Text>
+                <Text style={styles.balanceTitle}>{t('home.total_balance')}</Text>
                 {loadingBalance ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
@@ -341,13 +327,12 @@ const HomeScreen = ({ navigation }) => {
                   <View style={styles.reportbkg}>
                     {loadingBalance ? null : renderBalanceChange()}
                   </View>
-                  <Text style={styles.balanceReportText}> vs last month</Text>
+                  <Text style={styles.balanceReportText}> {t('home.vs_last_month')}</Text>
                 </View>
               </View>
             </LinearGradient>
           </View>
 
-          {/* Actions */}
           <View style={styles.actions}>
             <TouchableOpacity onPress={onTransactionAdd}>
               <View style={styles.actionCard}>
@@ -356,13 +341,13 @@ const HomeScreen = ({ navigation }) => {
                   size={24}
                   color="#2563EB"
                 />
-                <Text style={styles.actionText}>Add</Text>
+                <Text style={styles.actionText}>{t('home.actions.add')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={onTransfer}>
               <View style={styles.actionCard}>
                 <Ionicons name="card-outline" size={24} color="#2563EB" />
-                <Text style={styles.actionText}>Transfer</Text>
+                <Text style={styles.actionText}>{t('home.actions.transfer')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={onBudget}>
@@ -372,7 +357,7 @@ const HomeScreen = ({ navigation }) => {
                   size={24}
                   color="#2563EB"
                 />
-                <Text style={styles.actionText}>Budget</Text>
+                <Text style={styles.actionText}>{t('home.actions.budget')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={onReports}>
@@ -382,17 +367,16 @@ const HomeScreen = ({ navigation }) => {
                   size={24}
                   color="#2563EB"
                 />
-                <Text style={styles.actionText}>Reports</Text>
+                <Text style={styles.actionText}>{t('home.actions.reports')}</Text>
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* Recent Transactions */}
           <View style={styles.recentTransactions}>
             <View style={styles.recentHeader}>
-              <Text style={styles.recentTitle}>Recent Transactions</Text>
+              <Text style={styles.recentTitle}>{t('home.recent_transactions')}</Text>
               <TouchableOpacity onPress={onAllTransactions}>
-                <Text style={styles.recentAll}>See all</Text>
+                <Text style={styles.recentAll}>{t('home.see_all')}</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.recentGroup}>
@@ -440,10 +424,9 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Budget Overview */}
           <View style={styles.budgetOverview}>
             <View style={styles.budgetHeader}>
-              <Text style={styles.budgetOverviewText}>Budget Overview</Text>
+              <Text style={styles.budgetOverviewText}>{t('home.budget_overview')}</Text>
             </View>
             <View style={styles.budgetList}>
               {budgetData.map((item, index) => {
@@ -471,17 +454,16 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Monthly Expenses */}
           <View style={styles.monthlyExpenses}>
             <View style={styles.expensesHeader}>
-              <Text style={styles.monthlyExpensesText}>Monthly Expenses</Text>
+              <Text style={styles.monthlyExpensesText}>{t('home.monthly_expenses')}</Text>
             </View>
 
             {loadingChart ? (
               <ActivityIndicator size="large" color="#2563EB" />
             ) : monthlyExpensesData.labels.length === 0 ? (
               <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
-                No data available.
+                {t('home.no_data')}
               </Text>
             ) : (
               <BarChart

@@ -26,6 +26,7 @@ import NotificationsScreen from "../screens/NotificationsScreen";
 import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import PersonalInformationScreen from "../screens/PersonalInformationScreen";
 import BudgetCategoriesScreen from "../screens/BudgetCategoriesScreen";
+import LanguageScreen from "../screens/LanguageScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -121,22 +122,28 @@ const AppNavigator = () => {
         component={AppSettings}
         options={makeBackOptions}
       />
-      
+
       <Stack.Screen
         name="All Transactions"
         component={AllTransactionsScreen}
         options={makeBackOptions}
       />
-      
+
       <Stack.Screen
         name="Personal Information"
         component={PersonalInformationScreen}
         options={makeBackOptions}
       />
-      
+
       <Stack.Screen
         name="Budget Categories"
         component={BudgetCategoriesScreen}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="Language"
+        component={LanguageScreen}
         options={makeBackOptions}
       />
     </Stack.Navigator>

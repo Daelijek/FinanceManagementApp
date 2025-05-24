@@ -18,6 +18,7 @@ import { KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import Svg, { G, Circle } from "react-native-svg";
 import { apiFetch } from "../api";
@@ -28,15 +29,21 @@ const radius = 50;
 const strokeWidth = 25;
 const circumference = 2 * Math.PI * radius;
 
-const tabs = ["All", "Income", "Expenses"];
-
 const IconCmp = (iconName) =>
   iconName && iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
 
 const TransactionScreen = () => {
+  const { t } = useTranslation();
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const [searchText, setSearchText] = useState("");
+
+  // Обновленные вкладки с переводами
+  const tabs = [
+    t('transactions.all'),
+    t('transactions.income'), 
+    t('transactions.expenses')
+  ];
 
   const [activeTab, setActiveTab] = useState(tabs[0]);
   const [transactions, setTransactions] = useState([]);
@@ -127,12 +134,12 @@ const TransactionScreen = () => {
   const onSave = async () => {
     if (!selectedTransaction) return;
     if (!editDescription.trim()) {
-      Alert.alert("Ошибка", "Описание не может быть пустым");
+      Alert.alert(t('common.error'), t('transactions.description_required'));
       return;
     }
     const amountNum = parseFloat(editAmount);
     if (isNaN(amountNum)) {
-      Alert.alert("Ошибка", "Введите корректную сумму");
+      Alert.alert(t('common.error'), t('transactions.amount_required'));
       return;
     }
     setSaving(true);
@@ -161,13 +168,13 @@ const TransactionScreen = () => {
 
       if (!res.ok) {
         const errJson = await res.json();
-        throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при сохранении");
+        throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : t('transactions.save_error'));
       }
 
       await fetchTransactions();
       closeModal();
     } catch (error) {
-      Alert.alert("Ошибка", error.message);
+      Alert.alert(t('common.error'), error.message);
       setSaving(false);
     }
   };
@@ -175,12 +182,12 @@ const TransactionScreen = () => {
   const onDelete = async () => {
     if (!selectedTransaction) return;
     Alert.alert(
-      "Удалить транзакцию?",
-      "Вы уверены, что хотите удалить эту транзакцию?",
+      t('transactions.delete_transaction'),
+      t('transactions.confirm_delete'),
       [
-        { text: "Отмена", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         {
-          text: "Удалить",
+          text: t('common.delete'),
           style: "destructive",
           onPress: async () => {
             setDeleting(true);
@@ -196,12 +203,12 @@ const TransactionScreen = () => {
 
               if (!res.ok) {
                 const errJson = await res.json();
-                throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при удалении");
+                throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : t('transactions.delete_error'));
               }
               await fetchTransactions();
               closeModal();
             } catch (error) {
-              Alert.alert("Ошибка", error.message);
+              Alert.alert(t('common.error'), error.message);
               setDeleting(false);
             }
           },
@@ -211,14 +218,14 @@ const TransactionScreen = () => {
   };
 
   const filteredTransactions = transactions.filter((tx) => {
-    if (activeTab === "All") {
+    if (activeTab === t('transactions.all')) {
       return tx.description.toLowerCase().includes(searchText.trim().toLowerCase());
     }
 
     // Маппинг вкладки на значение в transaction_type
     const tabTypeMap = {
-      Income: "income",
-      Expenses: "expense",
+      [t('transactions.income')]: "income",
+      [t('transactions.expenses')]: "expense",
     };
 
     const expectedType = tabTypeMap[activeTab];
@@ -286,7 +293,7 @@ const TransactionScreen = () => {
             <View style={styles.containerInner}>
               <View style={[styles.header, { alignItems: "center" }]}>
                 <Text style={[styles.headerText, isDark && styles.headerTextDark]}>
-                  Transactions
+                  {t('transactions.title')}
                 </Text>
                 <View style={[styles.searchContainer, isDark && styles.searchContainerDark]}>
                   <Ionicons
@@ -297,7 +304,7 @@ const TransactionScreen = () => {
                   />
                   <TextInput
                     style={[styles.searchInput, isDark && styles.searchInputDark]}
-                    placeholder="Search by description"
+                    placeholder={t('transactions.search_placeholder')}
                     placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
                     value={searchText}
                     onChangeText={setSearchText}
@@ -316,7 +323,7 @@ const TransactionScreen = () => {
                   style={styles.balanceCardGradient}
                 >
                   <View style={styles.balanceCard}>
-                    <Text style={styles.balanceTitle}>Total Balance</Text>
+                    <Text style={styles.balanceTitle}>{t('home.total_balance')}</Text>
                     <Text
                       style={[
                         styles.balanceAmount,
@@ -327,9 +334,6 @@ const TransactionScreen = () => {
                     >
                       {summary.net_balance >= 0 ? "+" : "-"} {Math.abs(summary.net_balance).toFixed(2)} $
                     </Text>
-                    {/* <View style={styles.balanceGroup}>
-                      <Text style={styles.balanceReportText}>This month</Text>
-                    </View> */}
 
                     <View style={styles.graphContainer}>
                       {[20, 40, 25, 45, 30, 40, 55].map((height, index) => (
@@ -379,7 +383,7 @@ const TransactionScreen = () => {
               <View style={styles.pieChartContainer}>
                 <View style={styles.pieChartHead}>
                   <Text style={[styles.pieChartTitle, isDark && styles.pieChartTitleDark]}>
-                    Spending by Category
+                    {t('transactions.spending_by_category')}
                   </Text>
                 </View>
                 <View style={styles.pieChartGroup}>
@@ -435,7 +439,7 @@ const TransactionScreen = () => {
               <View style={styles.transactionList}>
                 <View style={styles.transactionHead}>
                   <Text style={[styles.transactionTitle, isDark && styles.transactionTitleDark]}>
-                    Transactions
+                    {t('transactions.title')}
                   </Text>
                 </View>
                 {filteredTransactions.length === 0 ? (
@@ -446,7 +450,7 @@ const TransactionScreen = () => {
                       color: isDark ? "#D1D5DB" : "#4B5563",
                     }}
                   >
-                    No transactions found.
+                    {t('transactions.no_transactions')}
                   </Text>
                 ) : (
                   filteredTransactions.map(
@@ -551,7 +555,7 @@ const TransactionScreen = () => {
             >
               <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80} // Можно подстроить под ваш UI
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 80}
                 style={{ flex: 1, justifyContent: "flex-end" }}
               >
                 <Animated.View
@@ -564,14 +568,16 @@ const TransactionScreen = () => {
                   ]}
                 >
                   <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>
-                    Edit Transaction
+                    {t('transactions.edit_transaction')}
                   </Text>
 
                   <View style={styles.formGroup}>
-                    <Text style={[styles.label, isDark && styles.labelDark]}>Description</Text>
+                    <Text style={[styles.label, isDark && styles.labelDark]}>
+                      {t('transactions.description')}
+                    </Text>
                     <TextInput
                       style={[styles.input, isDark && styles.inputDark]}
-                      placeholder="Description"
+                      placeholder={t('transactions.description')}
                       placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
                       value={editDescription}
                       onChangeText={setEditDescription}
@@ -580,10 +586,12 @@ const TransactionScreen = () => {
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={[styles.label, isDark && styles.labelDark]}>Amount</Text>
+                    <Text style={[styles.label, isDark && styles.labelDark]}>
+                      {t('transactions.amount')}
+                    </Text>
                     <TextInput
                       style={[styles.input, isDark && styles.inputDark]}
-                      placeholder="Amount"
+                      placeholder={t('transactions.amount')}
                       placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
                       value={editAmount}
                       onChangeText={setEditAmount}
@@ -597,7 +605,7 @@ const TransactionScreen = () => {
                   <View style={[styles.formGroup, styles.horizontalGroup]}>
                     <View style={{ flex: 1, marginRight: 12 }}>
                       <Text style={[styles.label, isDark && styles.labelDark]}>
-                        Payment Method
+                        {t('transactions.payment_method')}
                       </Text>
                       <View style={styles.typeSelector}>
                         {["cash", "card"].map((method) => {
@@ -619,7 +627,7 @@ const TransactionScreen = () => {
                                   isActive ? styles.typeButtonTextActive : styles.typeButtonTextInactive,
                                 ]}
                               >
-                                {method.charAt(0).toUpperCase() + method.slice(1)}
+                                {method === 'cash' ? t('transactions.cash') : t('transactions.card')}
                               </Text>
                             </TouchableOpacity>
                           );
@@ -635,7 +643,7 @@ const TransactionScreen = () => {
                       }}
                     >
                       <Text style={[styles.label, isDark && styles.labelDark]}>
-                        Recurring
+                        {t('transactions.recurring')}
                       </Text>
                       <TouchableOpacity
                         onPress={() => !saving && !deleting && setEditIsRecurring(!editIsRecurring)}
@@ -656,21 +664,29 @@ const TransactionScreen = () => {
                       onPress={closeModal}
                       disabled={saving || deleting}
                     >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                      <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalButton, styles.deleteButton]}
                       onPress={onDelete}
                       disabled={saving || deleting}
                     >
-                      {deleting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.deleteButtonText}>Delete</Text>}
+                      {deleting ? (
+                        <ActivityIndicator color="#FFF" />
+                      ) : (
+                        <Text style={styles.deleteButtonText}>{t('common.delete')}</Text>
+                      )}
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalButton, styles.saveButton]}
                       onPress={onSave}
                       disabled={saving || deleting}
                     >
-                      {saving ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save</Text>}
+                      {saving ? (
+                        <ActivityIndicator color="#FFF" />
+                      ) : (
+                        <Text style={styles.saveButtonText}>{t('common.save')}</Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                 </Animated.View>

@@ -11,6 +11,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
+import { useTranslation } from 'react-i18next';
 
 const ProfileScreen = ({ navigation }) => {
   const onPrivacyPolicy = () => navigation.navigate("Privacy Policy")
@@ -18,6 +19,8 @@ const ProfileScreen = ({ navigation }) => {
   const onPersonalInformation = () => navigation.navigate("Personal Information")
   const onBudgetCategories = () => navigation.navigate("Budget Categories")
   const onNotifications = () => navigation.navigate("Notifications")
+  const { t } = useTranslation();
+  const onLanguage = () => navigation.navigate("Language");
 
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
@@ -165,10 +168,10 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.preferencesItem}>
+            <TouchableOpacity style={styles.preferencesItem} onPress={onLanguage}>
               <View style={styles.itemGroup}>
                 <Ionicons name="language" size={24} color="#3B82F6" />
-                <Text style={styles.settingText}>Language</Text>
+                <Text style={styles.settingText}>{t('profile.language')}</Text>
               </View>
               <Ionicons
                 name="chevron-forward-outline"

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useCallback, useRef } from "react";
+import React, { useState, useContext, useEffect, useCallback } from "react";
 import {
   SectionList,
   SafeAreaView,
@@ -7,16 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
-  TextInput,
-  Alert,
-  Animated,
-  Easing,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
@@ -45,64 +36,127 @@ export default function AllTransactionsScreen() {
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-
-  const [editDescription, setEditDescription] = useState("");
-  const [editAmount, setEditAmount] = useState("");
-  const [editPaymentMethod, setEditPaymentMethod] = useState("cash");
-  const [editIsRecurring, setEditIsRecurring] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const slideUp = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [300, 0],
-  });
-
   const fetchGroupedTransactions = useCallback(async (period) => {
     setLoading(true);
     try {
-      let res;
-      let data;
-
-      if (period === "all") {
-        // Получаем сгруппированные данные для всех транзакций
-        res = await apiFetch("/api/v1/transactions/grouped?skip=0&limit=100");
-        if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
-        data = await res.json(); // Ожидаем, что данные уже сгруппированы и в нужном формате
-      } else {
-        // Получаем транзакции за период (day, week, month, year)
-        res = await apiFetch(`/api/v1/transactions/period/${period}`);
-        if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
-        const json = await res.json();
-        const transactions = json.transactions || [];
-
-        // Ручная группировка по дате для SectionList
-        const grouped = transactions.reduce((acc, tx) => {
-          const dateKey = new Date(tx.transaction_date).toLocaleDateString();
-          const section = acc.find(s => s.title === dateKey);
-          if (section) {
-            section.data.push(tx);
-          } else {
-            acc.push({ title: dateKey, data: [tx] });
-          }
-          return acc;
-        }, []);
-
-        // Отсортировать группы по дате (новые сверху)
-        grouped.sort((a, b) => new Date(b.title) - new Date(a.title));
-
-        // Также можно отсортировать транзакции внутри групп по времени
-        grouped.forEach(section => {
-          section.data.sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
-        });
-
-        data = grouped;
+      // Для всех периодов получаем все транзакции и фильтруем на клиенте
+      const res = await apiFetch("/api/v1/transactions/?skip=0&limit=1000");
+      if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
+      
+      const json = await res.json();
+      const allTransactions = json.transactions || [];
+      
+      // Фильтруем транзакции по периоду
+      const now = new Date();
+      let filteredTransactions = [];
+      
+      switch (period) {
+        case 'all':
+          // Все транзакции
+          filteredTransactions = allTransactions;
+          break;
+          
+        case 'week':
+          // Последние 7 дней
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          filteredTransactions = allTransactions.filter(tx => {
+            const txDate = new Date(tx.transaction_date);
+            return txDate >= weekAgo && txDate <= now;
+          });
+          break;
+          
+        case 'month':
+          // Текущий календарный месяц
+          const currentYear = now.getFullYear();
+          const currentMonth = now.getMonth();
+          
+          filteredTransactions = allTransactions.filter(tx => {
+            const txDate = new Date(tx.transaction_date);
+            return txDate.getFullYear() === currentYear && 
+                   txDate.getMonth() === currentMonth;
+          });
+          break;
+          
+        case 'year':
+          // Текущий календарный год
+          const currentYearOnly = now.getFullYear();
+          
+          filteredTransactions = allTransactions.filter(tx => {
+            const txDate = new Date(tx.transaction_date);
+            return txDate.getFullYear() === currentYearOnly;
+          });
+          break;
+          
+        default:
+          filteredTransactions = allTransactions;
       }
+      
+      // Группируем отфильтрованные транзакции по дням
+      const grouped = filteredTransactions.reduce((acc, tx) => {
+        const txDate = new Date(tx.transaction_date);
+        
+        const dateKey = txDate.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        
+        const section = acc.find(s => s.title === dateKey);
+        if (section) {
+          section.data.push(tx);
+        } else {
+          acc.push({ title: dateKey, data: [tx] });
+        }
+        return acc;
+      }, []);
 
-      setSections(data);
+      // Сортируем группы по дате (новые сверху)
+      grouped.sort((a, b) => {
+        const parseDate = (dateStr) => {
+          const parts = dateStr.split(' ');
+          const day = parseInt(parts[0]);
+          const month = parts[1];
+          const year = parseInt(parts[2]);
+          
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthIndex = monthNames.indexOf(month);
+          
+          return new Date(year, monthIndex, day);
+        };
+        
+        const dateA = parseDate(a.title);
+        const dateB = parseDate(b.title);
+        return dateB - dateA;
+      });
+
+      // Сортируем транзакции внутри каждой группы (новые сверху)
+      grouped.forEach(section => {
+        section.data.sort((a, b) => {
+          const dateA = new Date(a.transaction_date);
+          const dateB = new Date(b.transaction_date);
+          return dateB - dateA;
+        });
+      });
+
+      setSections(grouped);
+      
+      // Временная отладка
+      console.log(`=== Debug info for period: ${period} ===`);
+      console.log(`Total transactions: ${allTransactions.length}`);
+      console.log(`Filtered transactions: ${filteredTransactions.length}`);
+      console.log(`Grouped sections: ${grouped.length}`);
+      
+      // Показываем первые несколько транзакций для проверки
+      filteredTransactions.slice(0, 5).forEach((tx, index) => {
+        console.log(`Transaction ${index + 1}:`, {
+          description: tx.description,
+          type: tx.transaction_type,
+          amount: tx.amount,
+          date: tx.transaction_date
+        });
+      });
+      
     } catch (error) {
       console.error("Ошибка загрузки транзакций:", error);
       setSections([]);
@@ -114,135 +168,6 @@ export default function AllTransactionsScreen() {
   useEffect(() => {
     fetchGroupedTransactions(activeTab);
   }, [activeTab, fetchGroupedTransactions]);
-
-  const openModal = (transaction) => {
-    setSelectedTransaction(transaction);
-    setEditDescription(transaction.description || "");
-    setEditAmount(String(transaction.amount));
-    setEditPaymentMethod(transaction.payment_method || "cash");
-    setEditIsRecurring(!!transaction.is_recurring);
-    setModalVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 300,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeModal = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 250,
-      easing: Easing.in(Easing.ease),
-      useNativeDriver: true,
-    }).start(() => {
-      setModalVisible(false);
-      setSelectedTransaction(null);
-      setSaving(false);
-      setDeleting(false);
-    });
-  };
-
-  const onSave = async () => {
-    if (!selectedTransaction) return;
-
-    if (!editDescription.trim()) {
-      Alert.alert("Ошибка", "Описание не может быть пустым");
-      return;
-    }
-
-    const amountNum = parseFloat(editAmount);
-    if (isNaN(amountNum)) {
-      Alert.alert("Ошибка", "Введите корректную сумму");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) throw new Error("Токен авторизации отсутствует");
-
-      const body = {
-        description: editDescription,
-        amount: amountNum,
-        payment_method: editPaymentMethod,
-        is_recurring: editIsRecurring,
-        transaction_type: selectedTransaction.transaction_type,
-        transaction_date: selectedTransaction.transaction_date,
-        category_id: selectedTransaction.category_id,
-        note: selectedTransaction.note || "",
-      };
-
-      const res = await fetch(
-        `${process.env.API_URL || "http://localhost:8000"}/api/v1/transactions/${selectedTransaction.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        }
-      );
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при сохранении");
-      }
-
-      await fetchGroupedTransactions(activeTab);
-      closeModal();
-    } catch (error) {
-      Alert.alert("Ошибка", error.message);
-      setSaving(false);
-    }
-  };
-
-  const onDelete = () => {
-    if (!selectedTransaction) return;
-
-    Alert.alert(
-      "Удалить транзакцию?",
-      "Вы уверены, что хотите удалить эту транзакцию?",
-      [
-        { text: "Отмена", style: "cancel" },
-        {
-          text: "Удалить",
-          style: "destructive",
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              const token = await AsyncStorage.getItem("token");
-              if (!token) throw new Error("Токен авторизации отсутствует");
-
-              const res = await fetch(
-                `${process.env.API_URL || "http://localhost:8000"}/api/v1/transactions/${selectedTransaction.id}`,
-                {
-                  method: "DELETE",
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                }
-              );
-
-              if (!res.ok) {
-                const errJson = await res.json();
-                throw new Error(errJson.detail ? JSON.stringify(errJson.detail) : "Ошибка при удалении");
-              }
-
-              await fetchGroupedTransactions(activeTab);
-              closeModal();
-            } catch (error) {
-              Alert.alert("Ошибка", error.message);
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   return (
     <SafeAreaView
@@ -304,22 +229,34 @@ export default function AllTransactionsScreen() {
           renderItem={({ item }) => {
             const isIncome = item.transaction_type === "income";
             const Icon = IconCmp(item.category_icon || "card-outline");
+            
+            // Используем цвет категории или дефолтные цвета
+            const iconColor = item.category_color || 
+              (isIncome ? "#16A34A" : (isDark ? "#9CA3AF" : "#4B5563"));
+            
+            // Правильно обрабатываем отображение суммы
+            const displayAmount = isIncome 
+              ? `+${Math.abs(item.amount).toFixed(2)}` 
+              : `-${Math.abs(item.amount).toFixed(2)}`;
+            
+            const amountColor = isIncome ? "#16A34A" : (isDark ? "#F9FAFB" : "#111827");
+            
+            console.log(`Transaction: ${item.description}, Type: ${item.transaction_type}, Amount: ${item.amount}, Display: ${displayAmount}`);
+            
             return (
-              <TouchableOpacity
+              <View
                 style={[styles.row, isDark ? styles.rowDark : styles.rowLight]}
-                onPress={() => openModal(item)}
-                activeOpacity={0.7}
               >
                 <View
                   style={[
                     styles.iconContainer,
-                    isIncome ? styles.incomeBg : styles.expenseBg,
+                    isIncome ? styles.incomeBg : (isDark ? styles.expenseBgDark : styles.expenseBg),
                   ]}
                 >
                   <Icon
                     name={item.category_icon || "card-outline"}
                     size={20}
-                    color={isIncome ? "#16A34A" : "#4B5563"}
+                    color={iconColor}
                   />
                 </View>
 
@@ -339,173 +276,30 @@ export default function AllTransactionsScreen() {
                       isDark ? styles.dateDark : styles.dateLight,
                     ]}
                   >
-                    {new Date(item.transaction_date).toLocaleDateString()}
+                    {new Date(item.transaction_date).toLocaleDateString()} • {item.payment_method || 'cash'}
                   </Text>
                 </View>
 
                 <Text
                   style={[
                     styles.amount,
-                    isIncome ? styles.incomeText : styles.expenseText,
-                    isDark ? styles.amountDark : styles.amountLight,
+                    { color: amountColor },
                   ]}
                 >
-                  {isIncome ? "+" : "-"}
-                  {item.amount.toFixed(2)}
+                  {displayAmount}
                 </Text>
-              </TouchableOpacity>
+              </View>
             );
           }}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, isDark ? styles.emptyTextDark : styles.emptyTextLight]}>
+                No transactions found for this period
+              </Text>
+            </View>
+          )}
         />
       )}
-
-      <Modal
-        animationType="none"
-        transparent
-        visible={modalVisible}
-        onRequestClose={closeModal}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={closeModal}
-          style={styles.modalOverlay}
-        >
-          <Animated.View
-            style={[
-              styles.modalContent,
-              {
-                backgroundColor: isDark ? "#1F2937" : "#FFF",
-                transform: [{ translateY: slideUp }],
-              },
-            ]}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
-            >
-              <ScrollView keyboardShouldPersistTaps="handled">
-                <Text style={[styles.modalTitle, isDark && styles.modalTitleDark]}>
-                  Edit Transaction
-                </Text>
-
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, isDark && styles.labelDark]}>Description</Text>
-                  <TextInput
-                    style={[styles.input, isDark && styles.inputDark]}
-                    placeholder="Description"
-                    placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
-                    value={editDescription}
-                    onChangeText={setEditDescription}
-                    editable={!saving && !deleting}
-                    returnKeyType="done"
-                  />
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, isDark && styles.labelDark]}>Amount</Text>
-                  <TextInput
-                    style={[styles.input, isDark && styles.inputDark]}
-                    placeholder="Amount"
-                    placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
-                    value={editAmount}
-                    onChangeText={setEditAmount}
-                    keyboardType="numeric"
-                    editable={!saving && !deleting}
-                    returnKeyType="done"
-                  />
-                </View>
-
-                <View style={[styles.formGroup, styles.horizontalGroup]}>
-                  <View style={{ flex: 1, marginRight: 12 }}>
-                    <Text style={[styles.label, isDark && styles.labelDark]}>
-                      Payment Method
-                    </Text>
-                    <View style={styles.typeSelector}>
-                      {["cash", "card"].map((method) => (
-                        <TouchableOpacity
-                          key={method}
-                          style={[
-                            styles.typeButton,
-                            editPaymentMethod === method && styles.typeButtonActive,
-                            { flex: 1, marginRight: method === "cash" ? 8 : 0 },
-                          ]}
-                          onPress={() => !saving && !deleting && setEditPaymentMethod(method)}
-                          activeOpacity={0.7}
-                        >
-                          <Text
-                            style={[
-                              styles.typeButtonText,
-                              editPaymentMethod === method && styles.typeButtonTextActive,
-                            ]}
-                          >
-                            {method.charAt(0).toUpperCase() + method.slice(1)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  <View
-                    style={{
-                      justifyContent: "center",
-                      alignItems: "center",
-                      flex: 1,
-                    }}
-                  >
-                    <Text style={[styles.label, isDark && styles.labelDark]}>
-                      Recurring
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => !saving && !deleting && setEditIsRecurring(!editIsRecurring)}
-                      style={[
-                        styles.recurringToggle,
-                        editIsRecurring && styles.recurringToggleActive,
-                      ]}
-                      activeOpacity={0.7}
-                    >
-                      {editIsRecurring && (
-                        <Ionicons name="checkmark" size={20} color="#FFF" />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={closeModal}
-                    disabled={saving || deleting}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.deleteButton]}
-                    onPress={onDelete}
-                    disabled={saving || deleting}
-                  >
-                    {deleting ? (
-                      <ActivityIndicator color="#FFF" />
-                    ) : (
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.saveButton]}
-                    onPress={onSave}
-                    disabled={saving || deleting}
-                  >
-                    {saving ? (
-                      <ActivityIndicator color="#FFF" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>Save</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -595,6 +389,9 @@ const styles = StyleSheet.create({
   expenseBg: {
     backgroundColor: "#E5E7EB",
   },
+  expenseBgDark: {
+    backgroundColor: "#1F2937",
+  },
   incomeBg: {
     backgroundColor: "#DCFCE7",
   },
@@ -638,137 +435,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  modalOverlay: {
+  emptyContainer: {
     flex: 1,
-    backgroundColor: "#00000066",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    padding: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-    maxHeight: "80%",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 16,
-    color: "#000",
-  },
-  modalTitleDark: {
-    color: "#F9FAFB",
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontWeight: "600",
-    fontSize: 14,
-    marginBottom: 6,
-    color: "#000",
-  },
-  labelDark: {
-    color: "#D1D5DB",
-  },
-  horizontalGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#000",
-    backgroundColor: "#FAFAFA",
-  },
-  inputDark: {
-    borderColor: "#374151",
-    backgroundColor: "#1F2937",
-    color: "#F9FAFB",
-  },
-  typeSelector: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: "#2563EB",
-    marginHorizontal: 4,
-    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
+    paddingTop: 60,
   },
-  typeButtonActive: {
-    backgroundColor: "#2563EB",
-    borderWidth: 0,
-  },
-  typeButtonText: {
-    fontWeight: "600",
-    color: "#2563EB",
-    fontSize: 14,
+  emptyText: {
+    fontSize: 16,
     textAlign: "center",
   },
-  typeButtonTextActive: {
-    color: "#FFFFFF",
-  },
-  recurringToggle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 2,
-    borderColor: "#2563EB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  recurringToggleActive: {
-    backgroundColor: "#2563EB",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginHorizontal: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#E5E7EB",
-  },
-  cancelButtonText: {
+  emptyTextLight: {
     color: "#6B7280",
-    fontWeight: "600",
-    fontSize: 16,
   },
-  saveButton: {
-    backgroundColor: "#2563EB",
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 16,
-  },
-  deleteButton: {
-    backgroundColor: "#EF4444",
-  },
-  deleteButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 16,
+  emptyTextDark: {
+    color: "#9CA3AF",
   },
 });
