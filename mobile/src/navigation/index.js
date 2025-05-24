@@ -27,6 +27,9 @@ import AllTransactionsScreen from "../screens/AllTransactionsScreen";
 import PersonalInformationScreen from "../screens/PersonalInformationScreen";
 import BudgetCategoriesScreen from "../screens/BudgetCategoriesScreen";
 import LanguageScreen from "../screens/LanguageScreen";
+import SetBudgetScreen from "../screens/SetBudgetScreen";
+import AnalyticsScreen from "../screens/AnalyticsScreen";
+import AllBudgetsScreen from "../screens/AllBudgetsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -146,6 +149,25 @@ const AppNavigator = () => {
         component={LanguageScreen}
         options={makeBackOptions}
       />
+
+      <Stack.Screen
+        name="Set Budget"
+        component={SetBudgetScreen}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="Budget Analytics"
+        component={AnalyticsScreen}
+        options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="All Budgets"
+        component={AllBudgetsScreen}
+        options={makeBackOptions}
+      />
+
     </Stack.Navigator>
   );
 };

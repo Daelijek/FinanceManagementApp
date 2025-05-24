@@ -20,6 +20,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
@@ -30,6 +31,7 @@ const COUNTRIES = [
 ];
 
 export default function PersonalInformationScreen() {
+    const { t } = useTranslation();
     const { theme } = useContext(ThemeContext);
     const isDark = theme === "dark";
 
@@ -83,12 +85,12 @@ export default function PersonalInformationScreen() {
                 }
             } catch (err) {
                 console.error("Load profile error:", err);
-                Alert.alert("Ошибка", "Не удалось загрузить данные профиля");
+                Alert.alert(t('common.error'), t('personal_info.load_error'));
             } finally {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [t]);
 
     const onSave = async () => {
         setSaving(true);
@@ -118,10 +120,10 @@ export default function PersonalInformationScreen() {
                 setDob(d);
                 setTempDob(d);
             }
-            Alert.alert("Успешно", "Данные сохранены");
+            Alert.alert(t('common.success'), t('personal_info.data_saved'));
         } catch (err) {
             console.error("Save profile error:", err);
-            Alert.alert("Ошибка", "Не удалось сохранить данные");
+            Alert.alert(t('common.error'), t('personal_info.save_error'));
         } finally {
             setSaving(false);
         }
@@ -131,7 +133,7 @@ export default function PersonalInformationScreen() {
         try {
             const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (!perm.granted) {
-                return Alert.alert("Внимание", "Нужен доступ к фотогалерее");
+                return Alert.alert(t('common.error'), t('personal_info.gallery_permission'));
             }
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -156,10 +158,10 @@ export default function PersonalInformationScreen() {
             if (!res.ok) throw new Error(`Status ${res.status}`);
             const newUrl = await res.text();
             setPhotoUrl(newUrl);
-            Alert.alert("Успешно", "Фото обновлено");
+            Alert.alert(t('common.success'), t('personal_info.photo_updated'));
         } catch (err) {
             console.error("Upload photo error:", err);
-            Alert.alert("Ошибка", "Не удалось загрузить фото");
+            Alert.alert(t('common.error'), t('personal_info.photo_error'));
         }
     };
 
@@ -229,7 +231,7 @@ export default function PersonalInformationScreen() {
                                     : styles.changePhotoTextLight,
                             ]}
                         >
-                            Change Photo
+                            {t('personal_info.change_photo')}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -241,7 +243,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Full Name
+                        {t('personal_info.full_name')}
                     </Text>
                     <TextInput
                         style={[
@@ -250,7 +252,7 @@ export default function PersonalInformationScreen() {
                         ]}
                         value={fullName}
                         onChangeText={setFullName}
-                        placeholder="Full Name"
+                        placeholder={t('personal_info.full_name')}
                         placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                     />
                 </View>
@@ -262,7 +264,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Email Address
+                        {t('personal_info.email_address')}
                     </Text>
                     <View style={styles.inputRow}>
                         <TextInput
@@ -290,7 +292,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Phone Number
+                        {t('personal_info.phone_number')}
                     </Text>
                     <View style={styles.inputRow}>
                         <TextInput
@@ -302,7 +304,7 @@ export default function PersonalInformationScreen() {
                             value={phone}
                             onChangeText={setPhone}
                             keyboardType="phone-pad"
-                            placeholder="Phone Number"
+                            placeholder={t('personal_info.phone_number')}
                             placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                         />
                     </View>
@@ -315,7 +317,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Date of Birth
+                        {t('personal_info.date_of_birth')}
                     </Text>
                     <TouchableOpacity
                         style={[
@@ -353,10 +355,10 @@ export default function PersonalInformationScreen() {
                             >
                                 <View style={styles.iosPickerHeader}>
                                     <TouchableOpacity onPress={cancelDob}>
-                                        <Text style={styles.cancelButton}>Cancel</Text>
+                                        <Text style={styles.cancelButton}>{t('common.cancel')}</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={confirmDob}>
-                                        <Text style={styles.confirmButton}>Confirm</Text>
+                                        <Text style={styles.confirmButton}>{t('common.confirm')}</Text>
                                     </TouchableOpacity>
                                 </View>
                                 <DateTimePicker
@@ -384,7 +386,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Address
+                        {t('personal_info.address')}
                     </Text>
                     <TextInput
                         style={[
@@ -395,7 +397,7 @@ export default function PersonalInformationScreen() {
                         value={address}
                         onChangeText={setAddress}
                         multiline
-                        placeholder="Address"
+                        placeholder={t('personal_info.address')}
                         placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
                     />
                 </View>
@@ -407,7 +409,7 @@ export default function PersonalInformationScreen() {
                             isDark ? styles.labelDark : styles.labelLight,
                         ]}
                     >
-                        Tax Residence
+                        {t('personal_info.tax_residence')}
                     </Text>
                     <TouchableOpacity
                         style={[
@@ -427,7 +429,7 @@ export default function PersonalInformationScreen() {
                         >
                             {selectedCountry
                                 ? `${selectedCountry.label} (${selectedCountry.code})`
-                                : "Select Country"}
+                                : t('personal_info.select_country')}
                         </Text>
                         <Ionicons
                             name="chevron-forward"
@@ -449,7 +451,7 @@ export default function PersonalInformationScreen() {
                     {saving ? (
                         <ActivityIndicator color="#fff" />
                     ) : (
-                        <Text style={styles.saveButtonText}>Save Changes</Text>
+                        <Text style={styles.saveButtonText}>{t('personal_info.save_changes')}</Text>
                     )}
                 </TouchableOpacity>
 
@@ -478,18 +480,17 @@ export default function PersonalInformationScreen() {
     );
 }
 
+// Стили остаются теми же
 const styles = StyleSheet.create({
     container: { flex: 1 },
     containerLight: { backgroundColor: "#FFF" },
     containerDark: { backgroundColor: "#111827" },
-
     contentContainer: {
         paddingHorizontal: 20,
         paddingTop: 24,
         paddingBottom: 40,
         alignItems: "center",
     },
-
     avatarWrapper: {
         alignItems: "center",
         marginBottom: 32,
@@ -522,7 +523,6 @@ const styles = StyleSheet.create({
     },
     changePhotoTextLight: { color: "#2563EB" },
     changePhotoTextDark: { color: "#FFFFFF" },
-
     field: {
         width: "100%",
         marginBottom: 20,
@@ -534,7 +534,6 @@ const styles = StyleSheet.create({
     },
     labelLight: { color: "#374151" },
     labelDark: { color: "#9CA3AF" },
-
     input: {
         borderWidth: 1,
         borderRadius: 8,
@@ -564,7 +563,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         right: 12,
     },
-
     dateInput: {
         flexDirection: "row",
         alignItems: "center",
@@ -587,7 +585,6 @@ const styles = StyleSheet.create({
     },
     dateTextLight: { color: "#111827" },
     dateTextDark: { color: "#FFFFFF" },
-
     iosPickerContainer: {
         marginTop: 8,
         borderRadius: 8,
@@ -603,12 +600,10 @@ const styles = StyleSheet.create({
     cancelButton: { fontSize: 16, color: "#EF4444" },
     confirmButton: { fontSize: 16, color: "#2563EB" },
     iosPicker: { height: 200 },
-
     textArea: {
         minHeight: 60,
         textAlignVertical: "top",
     },
-
     row: {
         flexDirection: "row",
         alignItems: "center",
@@ -626,7 +621,6 @@ const styles = StyleSheet.create({
     inputTextDark: {
         color: "#FFFFFF",
     },
-
     saveButton: {
         width: "100%",
         borderRadius: 8,
@@ -641,7 +635,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
     },
-
     modalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.4)",
@@ -662,5 +655,9 @@ const styles = StyleSheet.create({
         color: "#2563EB",
         textAlign: "center",
     },
-
+    loader: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
 });

@@ -12,10 +12,12 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";   // ← импортируем apiFetch вместо API_URL
 
 const Registration = ({ navigation }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -68,8 +70,7 @@ const Registration = ({ navigation }) => {
   const pressedButton = () => navigation.navigate("Login");
   const handleGoogleLogin = () => console.log("Google login pressed");
   const handleAppleLogin = () => console.log("Apple login pressed");
-  const handlePrivacyPolicy = () => navigation.navigate("PrivacyPolicy");
-
+  const handlePrivacyPolicy = () => navigation.navigate("Privacy Policy");
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
@@ -87,20 +88,20 @@ const Registration = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Start Your Financial Journey</Text>
+        <Text style={styles.title}>{t('auth.start_journey')}</Text>
         <Text style={styles.titleLable}>
-          Join millions managing their money smarter
+          {t('auth.join_millions')}
         </Text>
 
         {/* Full Name */}
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelFullName">
-              Full Name
+              {t('auth.full_name')}
             </Text>
             <TextInput
               {...commonInputProps}
-              placeholder="Enter your full name"
+              placeholder={t('auth.enter_full_name')}
               value={fullName}
               onChangeText={setFullName}
               aria-labelledby="labelFullName"
@@ -120,11 +121,11 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelEmail">
-              Email Address
+              {t('auth.email')}
             </Text>
             <TextInput
               {...commonInputProps}
-              placeholder="Enter your email"
+              placeholder={t('auth.enter_email')}
               value={email}
               onChangeText={setEmail}
               aria-labelledby="labelEmail"
@@ -144,12 +145,12 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelPassword">
-              Password
+              {t('auth.password')}
             </Text>
             <TextInput
               {...commonInputProps}
               secureTextEntry
-              placeholder="Create password"
+              placeholder={t('auth.create_password')}
               value={password}
               onChangeText={setPassword}
               aria-labelledby="labelPassword"
@@ -169,12 +170,12 @@ const Registration = ({ navigation }) => {
         <View style={styles.formArea}>
           <View style={styles.inputContainer}>
             <Text style={styles.label} nativeID="labelConfirmPassword">
-              Confirm Password
+              {t('auth.confirm_password')}
             </Text>
             <TextInput
               {...commonInputProps}
               secureTextEntry
-              placeholder="Confirm password"
+              placeholder={t('auth.confirm_password_text')}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               aria-labelledby="labelConfirmPassword"
@@ -198,7 +199,7 @@ const Registration = ({ navigation }) => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.buttonTitle}>Create Account</Text>
+            <Text style={styles.buttonTitle}>{t('auth.create_account')}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -216,7 +217,7 @@ const Registration = ({ navigation }) => {
                   color: "#6B7280",
                 }}
               >
-                or continue with
+                {t('auth.continue_with')}
               </Text>
             </View>
             <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
@@ -228,7 +229,7 @@ const Registration = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/google.png")}
                 />
-                <Text style={styles.socialText}>Google</Text>
+                <Text style={styles.socialText}>{t('auth.google')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleAppleLogin} style={styles.social}>
@@ -237,7 +238,7 @@ const Registration = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/apple.png")}
                 />
-                <Text style={styles.socialText}>Apple</Text>
+                <Text style={styles.socialText}>{t('auth.apple')}</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -248,25 +249,25 @@ const Registration = ({ navigation }) => {
                 source={require("../../assets/security.png")}
               />
               <Text style={styles.securityText}>
-                Your data is secure with 256-bit encryption
+                {t('auth.secure_data')}
               </Text>
             </View>
           </View>
           <View style={styles.signIn}>
             <View style={styles.signInGroup}>
-              <Text style={styles.signInText}>Already have an account?</Text>
+              <Text style={styles.signInText}>{t('auth.have_account')}</Text>
               <TouchableOpacity onPress={pressedButton}>
-                <Text style={styles.signInButton}> Sign in</Text>
+                <Text style={styles.signInButton}> {t('auth.sign_in')}</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={styles.policy}>
             <View style={styles.policyGroup}>
               <Text style={styles.policyText}>
-                By signing up, you agree to our Terms of Service and{" "}
+                {t('auth.agree_terms')}{" "}
               </Text>
               <TouchableOpacity onPress={handlePrivacyPolicy}>
-                <Text style={styles.policyButton}>Privacy Policy</Text>
+                <Text style={styles.policyButton}>{t('auth.privacy_policy')}</Text>
               </TouchableOpacity>
             </View>
           </View>

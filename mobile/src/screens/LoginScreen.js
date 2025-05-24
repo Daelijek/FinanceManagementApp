@@ -13,17 +13,19 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetch } from "../api";  // <-- вместо API_URL
 
 const LoginScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
     if (!email || !password) {
-      return Alert.alert("Ошибка", "Пожалуйста, заполните все поля.");
+      return Alert.alert(t('common.error'), t('auth.fill_all_fields'));
     }
 
     try {
@@ -69,13 +71,13 @@ const LoginScreen = ({ navigation }) => {
           message = data.detail;
         }
       } else {
-        message = rawBody || "Неизвестная ошибка при входе.";
+        message = rawBody || t('auth.login_error');
       }
 
-      Alert.alert("Ошибка входа", message);
+      Alert.alert(t('auth.login_error_title'), message);
     } catch (networkError) {
       console.error("Network error during login:", networkError);
-      Alert.alert("Ошибка сети", "Не удалось подключиться к серверу.");
+      Alert.alert(t('common.error'), t('auth.network_error'));
     }
   };
 
@@ -109,9 +111,9 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
         <View style={styles.block}>
-          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.title}>{t('auth.welcome_back')}</Text>
           <Text style={styles.titleLable}>
-            Manage your finances with confidence
+            {t('auth.manage_finances')}
           </Text>
 
           {/* Email Address */}
@@ -119,7 +121,7 @@ const LoginScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <TextInput
                 {...commonInputProps}
-                placeholder="Enter your email"
+                placeholder={t('auth.enter_email')}
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
                 value={email}
@@ -143,7 +145,7 @@ const LoginScreen = ({ navigation }) => {
               <TextInput
                 {...commonInputProps}
                 secureTextEntry={true}
-                placeholder="Create password"
+                placeholder={t('auth.enter_password')}
                 placeholderTextColor="#9CA3AF"
                 style={styles.input}
                 value={password}
@@ -160,13 +162,13 @@ const LoginScreen = ({ navigation }) => {
               />
               <TouchableOpacity onPress={handleForgotPass}>
                 <Text style={styles.label} nativeID="labelPassword">
-                  Forgot password?
+                  {t('auth.forgot_password')}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/*Create Account Button*/}
+          {/*Sign In Button*/}
           <TouchableOpacity onPress={handleLogin} style={styles.shadow}>
             <LinearGradient
               colors={["#2563EB", "#2563EB"]}
@@ -174,7 +176,7 @@ const LoginScreen = ({ navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Text style={styles.buttonTitle}>Sign in</Text>
+              <Text style={styles.buttonTitle}>{t('auth.sign_in')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -193,7 +195,7 @@ const LoginScreen = ({ navigation }) => {
                   color: "#6B7280",
                 }}
               >
-                or continue with
+                {t('auth.continue_with')}
               </Text>
             </View>
             <View style={{ flex: 1, height: 1, backgroundColor: "#E5E7EB" }} />
@@ -205,7 +207,7 @@ const LoginScreen = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/google.png")}
                 />
-                <Text style={styles.socialText}>Google</Text>
+                <Text style={styles.socialText}>{t('auth.google')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity onPress={handleAppleLogin} style={styles.social}>
@@ -214,15 +216,15 @@ const LoginScreen = ({ navigation }) => {
                   style={styles.socialImg}
                   source={require("../../assets/apple.png")}
                 />
-                <Text style={styles.socialText}>Apple</Text>
+                <Text style={styles.socialText}>{t('auth.apple')}</Text>
               </View>
             </TouchableOpacity>
           </View>
           <View style={styles.signUp}>
             <View style={styles.signUpGroup}>
-              <Text style={styles.signUpText}>Don't have an account?</Text>
+              <Text style={styles.signUpText}>{t('auth.no_account')}</Text>
               <TouchableOpacity onPress={handleSignUp}>
-                <Text style={styles.signUpButton}> Sign up</Text>
+                <Text style={styles.signUpButton}> {t('auth.sign_up')}</Text>
               </TouchableOpacity>
             </View>
           </View>

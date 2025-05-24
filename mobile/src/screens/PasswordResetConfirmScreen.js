@@ -12,10 +12,12 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
 const PasswordResetConfirmScreen = ({ navigation, route }) => {
+    const { t } = useTranslation();
     const { email } = route.params || {};
     const [token, setToken] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -27,7 +29,10 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
 
     const handleConfirmReset = async () => {
         if (!token || !newPassword || !confirmPassword) {
-            return Alert.alert("Ошибка", "Пожалуйста, заполните все поля.");
+            return Alert.alert(t('common.error'), t('forgot_password.fill_all_fields'));
+        }
+        if (newPassword !== confirmPassword) {
+            return Alert.alert(t('common.error'), t('forgot_password.passwords_dont_match'));
         }
         try {
             const response = await apiFetch("/api/v1/auth/password-reset/confirm", {
@@ -42,7 +47,7 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
             let data = null;
             try { data = JSON.parse(raw); } catch { }
             if (response.ok) {
-                Alert.alert("Успех", "Пароль успешно сброшен.");
+                Alert.alert(t('common.success'), t('forgot_password.password_reset_success'));
                 return navigation.navigate("Login");
             }
             const detail = data?.detail;
@@ -52,12 +57,12 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
             } else if (typeof detail === "string") {
                 msg = detail;
             } else {
-                msg = raw || "Неизвестная ошибка.";
+                msg = raw || t('forgot_password.unknown_error');
             }
-            Alert.alert("Ошибка", msg);
+            Alert.alert(t('common.error'), msg);
         } catch (e) {
             console.error(e);
-            Alert.alert("Ошибка сети", "Не удалось подключиться к серверу.");
+            Alert.alert(t('common.error'), t('forgot_password.network_error'));
         }
     };
 
@@ -74,16 +79,16 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                <Text style={styles.title}>New password</Text>
+                <Text style={styles.title}>{t('forgot_password.new_password')}</Text>
                 <Text style={styles.titleLable}>
-                    Enter the code and a new password for {email}
+                    {t('forgot_password.enter_code')} {email}
                 </Text>
 
                 <View style={styles.formArea}>
                     <View style={styles.inputContainer}>
                         <TextInput
                             {...commonInputProps}
-                            placeholder="The code from the email"
+                            placeholder={t('forgot_password.code_from_email')}
                             value={token}
                             onChangeText={setToken}
                             left={<TextInput.Icon icon="email-outline" color="gray" />}
@@ -96,7 +101,7 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
                         <TextInput
                             {...commonInputProps}
                             secureTextEntry
-                            placeholder="New password"
+                            placeholder={t('forgot_password.new_password_field')}
                             value={newPassword}
                             onChangeText={setNewPassword}
                             left={<TextInput.Icon icon="lock-outline" color="gray" />}
@@ -109,7 +114,7 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
                         <TextInput
                             {...commonInputProps}
                             secureTextEntry
-                            placeholder="Password Replay"
+                            placeholder={t('forgot_password.password_repeat')}
                             value={confirmPassword}
                             onChangeText={setConfirmPassword}
                             left={<TextInput.Icon icon="lock-check-outline" color="gray" />}
@@ -124,14 +129,14 @@ const PasswordResetConfirmScreen = ({ navigation, route }) => {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                     >
-                        <Text style={styles.buttonTitle}>Confirm</Text>
+                        <Text style={styles.buttonTitle}>{t('forgot_password.confirm')}</Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
 
             <View style={styles.footer}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.signUpButton}>← Back to Password Recovery</Text>
+                    <Text style={styles.signUpButton}>{t('forgot_password.back_to_recovery')}</Text>
                 </TouchableOpacity>
             </View>
 

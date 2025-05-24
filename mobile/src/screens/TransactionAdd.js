@@ -18,10 +18,12 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
 const TransactionAdd = ({ navigation }) => {
+  const { t } = useTranslation();
   const [amount, setAmount] = useState("0.00");
   const [selectedType, setSelectedType] = useState("expense");
   const [categories, setCategories] = useState({ expense: [], income: [] });
@@ -57,13 +59,13 @@ const TransactionAdd = ({ navigation }) => {
         });
       } catch (e) {
         console.error(e);
-        Alert.alert("Ошибка", "Не удалось загрузить категории.");
+        Alert.alert(t('common.error'), t('transactions.category_load_error'));
       } finally {
         setLoadingCategories(false);
       }
     };
     loadCategories();
-  }, []);
+  }, [t]);
 
   const formatDate = (d) => {
     const today = new Date();
@@ -76,7 +78,7 @@ const TransactionAdd = ({ navigation }) => {
       month: "short",
       year: "numeric",
     });
-    return isToday ? `Today, ${str}` : str;
+    return isToday ? `${t('common.today')}, ${str}` : str;
   };
 
   const onChangeDate = (event, selected) => {
@@ -101,13 +103,13 @@ const TransactionAdd = ({ navigation }) => {
   const handleSave = async () => {
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0) {
-      return Alert.alert("Ошибка", "Введите корректную сумму.");
+      return Alert.alert(t('common.error'), t('transactions.amount_required'));
     }
     if (!selectedCategoryId) {
-      return Alert.alert("Ошибка", "Выберите категорию.");
+      return Alert.alert(t('common.error'), t('transactions.category_required'));
     }
     if (!selectedMethod) {
-      return Alert.alert("Ошибка", "Выберите способ оплаты.");
+      return Alert.alert(t('common.error'), t('transactions.method_required'));
     }
 
     const body = {
@@ -127,18 +129,18 @@ const TransactionAdd = ({ navigation }) => {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        Alert.alert("Успех", "Транзакция создана.");
+        Alert.alert(t('common.success'), t('transactions.transaction_saved'));
         navigation.goBack();
       } else {
         const err = await res.json();
         const msg = Array.isArray(err.detail)
           ? err.detail.map((e) => e.msg).join("\n")
-          : err.detail || "Неизвестная ошибка.";
-        Alert.alert("Ошибка", msg);
+          : err.detail || t('transactions.save_error');
+        Alert.alert(t('common.error'), msg);
       }
     } catch (e) {
       console.error(e);
-      Alert.alert("Ошибка сети", "Не удалось связаться с сервером.");
+      Alert.alert(t('common.error'), t('transactions.save_error'));
     }
   };
 
@@ -173,7 +175,7 @@ const TransactionAdd = ({ navigation }) => {
                   { color: selectedType === "expense" ? "#fff" : styles.switchText.color },
                 ]}
               >
-                Expense
+                {t('transactions.expense')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -189,7 +191,7 @@ const TransactionAdd = ({ navigation }) => {
                   { color: selectedType === "income" ? "#fff" : styles.switchText.color },
                 ]}
               >
-                Income
+                {t('transactions.income_label')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -211,7 +213,7 @@ const TransactionAdd = ({ navigation }) => {
           </View>
 
           <View style={styles.category}>
-            <Text style={styles.categoryTitle}>Category</Text>
+            <Text style={styles.categoryTitle}>{t('transactions.category')}</Text>
             {loadingCategories ? (
               <ActivityIndicator size="small" color={isDark ? "#fff" : "#000"} />
             ) : (
@@ -260,7 +262,7 @@ const TransactionAdd = ({ navigation }) => {
               >
                 <Ionicons name="calendar-outline" size={24} color="#4B5563" />
                 <View style={styles.dateInputPlaceholder}>
-                  <Text style={styles.dateInputLabel}>Date</Text>
+                  <Text style={styles.dateInputLabel}>{t('transactions.date')}</Text>
                   <Text style={styles.dateText}>{formatDate(date)}</Text>
                 </View>
               </TouchableOpacity>
@@ -269,10 +271,10 @@ const TransactionAdd = ({ navigation }) => {
                   <View style={styles.iosPickerContainer}>
                     <View style={styles.iosPickerHeader}>
                       <TouchableOpacity onPress={cancelDate}>
-                        <Text style={styles.cancelButton}>Cancel</Text>
+                        <Text style={styles.cancelButton}>{t('common.cancel')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={confirmDate}>
-                        <Text style={styles.confirmButton}>Confirm</Text>
+                        <Text style={styles.confirmButton}>{t('common.confirm')}</Text>
                       </TouchableOpacity>
                     </View>
                     <DateTimePicker
@@ -301,10 +303,10 @@ const TransactionAdd = ({ navigation }) => {
               >
                 <Ionicons name="document-text-outline" size={24} color="#4B5563" />
                 <View style={styles.noteInputPlaceholder}>
-                  <Text style={styles.noteInputLabel}>Note</Text>
+                  <Text style={styles.noteInputLabel}>{t('transactions.note')}</Text>
                   <TextInput
                     ref={noteRef}
-                    placeholder="Add note"
+                    placeholder={t('transactions.add_note')}
                     placeholderTextColor="#9CA3AF"
                     style={styles.input}
                     value={note}
@@ -322,13 +324,13 @@ const TransactionAdd = ({ navigation }) => {
               >
                 <Ionicons name="card-outline" size={24} color="#4B5563" />
                 <View style={styles.noteInputPlaceholder}>
-                  <Text style={styles.noteInputLabel}>Payment Method</Text>
+                  <Text style={styles.noteInputLabel}>{t('transactions.payment_method')}</Text>
                   <Text style={styles.noteText}>
                     {selectedMethod
                       ? selectedMethod === "cash"
-                        ? "Cash"
-                        : "Card"
-                      : "Select..."}
+                        ? t('transactions.cash')
+                        : t('transactions.card')
+                      : t('transactions.select_method')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -341,10 +343,10 @@ const TransactionAdd = ({ navigation }) => {
                 <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
                   <View style={styles.modalContainer}>
                     <Pressable style={styles.modalOption} onPress={() => handleMethodSelect("cash")}>
-                      <Text style={styles.modalText}>Cash</Text>
+                      <Text style={styles.modalText}>{t('transactions.cash')}</Text>
                     </Pressable>
                     <Pressable style={styles.modalOption} onPress={() => handleMethodSelect("card")}>
-                      <Text style={styles.modalText}>Card</Text>
+                      <Text style={styles.modalText}>{t('transactions.card')}</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -372,7 +374,7 @@ const TransactionAdd = ({ navigation }) => {
                       isRecurring && styles.recurringTextActive,
                     ]}
                   >
-                    Recurring Transaction
+                    {t('transactions.recurring_transaction')}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -382,7 +384,7 @@ const TransactionAdd = ({ navigation }) => {
               <TouchableOpacity style={styles.receiptePhotoInner}>
                 <Ionicons name="image-outline" size={24} color="#4B5563" />
                 <View style={styles.receipteContent}>
-                  <Text style={styles.receipteText}>Add Receipt Photo</Text>
+                  <Text style={styles.receipteText}>{t('transactions.add_receipt')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -396,7 +398,7 @@ const TransactionAdd = ({ navigation }) => {
                 activeOpacity={0.7}
               >
                 <View style={styles.saveTransactionContent}>
-                  <Text style={styles.saveTransactionText}>Save Transaction</Text>
+                  <Text style={styles.saveTransactionText}>{t('transactions.save_transaction')}</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -406,6 +408,8 @@ const TransactionAdd = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+// Остальная часть кода со стилями остается без изменений
 const getThemedStyles = (isDark) =>
   StyleSheet.create({
     container: {

@@ -12,10 +12,12 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { TextInput } from "react-native-paper";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 
 const ForgotPasswordScreen = ({ navigation }) => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState("");
     const { theme } = useContext(ThemeContext);
     const isDark = theme === "dark";
@@ -23,7 +25,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
     const handleSendReset = async () => {
         if (!email) {
-            return Alert.alert("Ошибка", "Пожалуйста, введите ваш email.");
+            return Alert.alert(t('common.error'), t('forgot_password.email_required'));
         }
         try {
             const response = await apiFetch("/api/v1/auth/password-reset/request", {
@@ -35,8 +37,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
             try { data = JSON.parse(raw); } catch { }
             if (response.ok) {
                 Alert.alert(
-                    "Успех",
-                    "Если этот email зарегистрирован, на него придёт письмо со ссылкой."
+                    t('common.success'),
+                    t('forgot_password.email_sent')
                 );
                 return navigation.navigate("PasswordResetConfirm", { email });
             }
@@ -47,12 +49,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
             } else if (typeof detail === "string") {
                 msg = detail;
             } else {
-                msg = raw || "Неизвестная ошибка.";
+                msg = raw || t('forgot_password.unknown_error');
             }
-            Alert.alert("Ошибка", msg);
+            Alert.alert(t('common.error'), msg);
         } catch (e) {
             console.error(e);
-            Alert.alert("Ошибка сети", "Не удалось подключиться к серверу.");
+            Alert.alert(t('common.error'), t('forgot_password.network_error'));
         }
     };
 
@@ -69,15 +71,15 @@ const ForgotPasswordScreen = ({ navigation }) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                <Text style={styles.title}>Password Recovery</Text>
+                <Text style={styles.title}>{t('forgot_password.title')}</Text>
                 <Text style={styles.titleLable}>
-                    Enter your email to receive a link or a reset code.
+                    {t('forgot_password.subtitle')}
                 </Text>
                 <View style={styles.formArea}>
                     <View style={styles.inputContainer}>
                         <TextInput
                             {...commonInputProps}
-                            placeholder="Your e-mail"
+                            placeholder={t('forgot_password.email_placeholder')}
                             value={email}
                             onChangeText={setEmail}
                             left={<TextInput.Icon icon="email-outline" color="gray" />}
@@ -91,13 +93,13 @@ const ForgotPasswordScreen = ({ navigation }) => {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                     >
-                        <Text style={styles.buttonTitle}>Send code</Text>
+                        <Text style={styles.buttonTitle}>{t('forgot_password.send_code')}</Text>
                     </LinearGradient>
                 </TouchableOpacity>
             </View>
             <View style={styles.footer}>
                 <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.signUpButton}>← Back to Login</Text>
+                    <Text style={styles.signUpButton}>{t('forgot_password.back_to_login')}</Text>
                 </TouchableOpacity>
             </View>
             <StatusBar style="auto" />

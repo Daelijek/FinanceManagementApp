@@ -31,6 +31,7 @@ const resources = {
                 profile: "Profile"
             },
             auth: {
+                enter_full_name: "Enter your full name",
                 welcome_back: "Welcome back",
                 manage_finances: "Manage your finances with confidence",
                 start_journey: "Start Your Financial Journey",
@@ -54,7 +55,11 @@ const resources = {
                 agree_terms: "By signing up, you agree to our Terms of Service and",
                 privacy_policy: "Privacy Policy",
                 google: "Google",
-                apple: "Apple"
+                apple: "Apple",
+                fill_all_fields: "Please fill in all fields.",
+                login_error: "Unknown login error.",
+                login_error_title: "Login Error",
+                network_error: "Failed to connect to server.",
             },
             home: {
                 welcome_back: "Welcome back",
@@ -88,6 +93,7 @@ const resources = {
                 add_transaction: "Add Transaction",
                 edit_transaction: "Edit Transaction",
                 expense: "Expense",
+                income_label: "Income",
                 category: "Category",
                 date: "Date",
                 note: "Note",
@@ -97,16 +103,21 @@ const resources = {
                 cash: "Cash",
                 card: "Card",
                 recurring_transaction: "Recurring Transaction",
+                recurring: "Recurring",
                 add_receipt: "Add Receipt Photo",
                 save_transaction: "Save Transaction",
                 delete_transaction: "Delete Transaction",
                 confirm_delete: "Are you sure you want to delete this transaction?",
                 description_required: "Description cannot be empty",
+                description: "Description",
                 amount_required: "Enter a valid amount",
+                amount: "Amount",
                 category_required: "Select a category",
                 method_required: "Select a payment method",
                 transaction_saved: "Transaction saved successfully",
-                transaction_deleted: "Transaction deleted successfully"
+                transaction_deleted: "Transaction deleted successfully",
+                save_error: "Failed to save transaction",
+                delete_error: "Failed to delete transaction"
             },
             profile: {
                 title: "Profile",
@@ -161,7 +172,10 @@ const resources = {
                 save_changes: "Save Changes",
                 data_saved: "Data saved successfully",
                 photo_updated: "Photo updated successfully",
-                gallery_permission: "Gallery access permission required"
+                gallery_permission: "Gallery access permission required",
+                load_error: "Failed to load profile data",
+                save_error: "Failed to save profile data",
+                photo_error: "Failed to upload photo"
             },
             notifications: {
                 title: "Notifications",
@@ -186,7 +200,26 @@ const resources = {
                 how_use: "How We Use Your Information",
                 data_security: "Data Security",
                 your_rights: "Your Rights",
-                contact_us: "Contact Us"
+                contact_us: "Contact Us",
+                personal_info: "Personal identification information (name, email address, phone number)",
+                financial_info: "Financial information (transaction history, account balances)",
+                device_info: "Device information and usage data",
+                provide_service: "To provide and maintain our service",
+                notify_changes: "To notify you about changes to our service",
+                customer_support: "To provide customer support",
+                detect_issues: "To detect, prevent and address technical issues",
+                security_intro: "The security of your data is important to us. We implement appropriate security measures to protect your personal information, including:",
+                encryption: "Encryption of sensitive data",
+                security_assessments: "Regular security assessments",
+                secure_storage: "Secure data storage systems",
+                rights_intro: "You have the right to:",
+                access_data: "Access your personal data",
+                correct_data: "Correct your personal data",
+                delete_data: "Request deletion of your personal data",
+                withdraw_consent: "Withdraw your consent at any time",
+                contact_intro: "If you have any questions about this Privacy Policy, please contact us:",
+                contact_email: "Email: privacy@financeapp.com",
+                contact_phone: "Phone: +7 (708) 835-0549",
             },
             forgot_password: {
                 title: "Password Recovery",
@@ -199,7 +232,15 @@ const resources = {
                 new_password_field: "New password",
                 password_repeat: "Password Repeat",
                 confirm: "Confirm",
-                back_to_recovery: "← Back to Password Recovery"
+                back_to_recovery: "← Back to Password Recovery",
+                email_required: "Please enter your email address.",
+                email_sent: "If this email is registered, you will receive a reset link.",
+                unknown_error: "Unknown error occurred.",
+                network_error: "Failed to connect to server.",
+                fill_all_fields: "Please fill in all fields.",
+                passwords_dont_match: "Passwords do not match.",
+                password_reset_success: "Password successfully reset.",
+                email_placeholder: "Your email"
             },
             language_screen: {
                 search_placeholder: "Search languages",
@@ -218,7 +259,72 @@ const resources = {
             transfer: {
                 title: "Transfer",
                 welcome: "Welcome to the Transfers Screen"
-            }
+            },
+            budget: {
+                title: "Budget",
+                welcome: "Welcome to the Budget Screen",
+                total_budget: "Total Budget",
+                spent: "Spent",
+                remaining: "Remaining",
+                add_expense: "Add Expense",
+                set_budget: "Set Budget",
+                analytics: "Analytics",
+                budget_by_category: "Budget by Category",
+                see_all: "See All",
+                insights: "Budget Insights"
+            },
+            set_budget: {
+                title: "Set Budget",
+                monthly_budget: "Monthly Budget",
+                used: "Used",
+                budget_categories: "Budget Categories",
+                add_new_category: "Add New Category",
+                total_budget: "Total Budget",
+                remaining: "Remaining",
+                spent: "Spent",
+                budget_saved: "Budget saved successfully!",
+                save_error: "Failed to save budget. Please try again."
+            },
+            analytics: {
+                title: "Budget Analytics",
+                total_budget: "Total Budget",
+                spent: "Spent",
+                monthly_overview: "Monthly Overview",
+                spending_by_category: "Spending by Category",
+                smart_insights: "Smart Insights"
+            },
+            all_budgets: {
+                title: "All Budgets",
+                budget_summary: "Budget Summary",
+                total_limit: "Total Limit",
+                total_spent: "Total Spent",
+                total_remaining: "Total Remaining",
+                all_budgets: "All Budgets",
+                remaining: "Remaining",
+                on_track: "On Track",
+                warning: "Warning",
+                over_budget: "Over Budget",
+                over_limit: "Over Limit",
+                delete_budget: "Delete Budget",
+                delete_confirmation: "Are you sure you want to delete this budget?",
+                no_budgets: "No Budgets Yet",
+                create_first_budget: "Create your first budget to start tracking your spending",
+                create_budget: "Create Budget"
+            },
+
+            create_budget: {
+                title: "Create Budget",
+                budget_amount: "Budget Amount",
+                select_category: "Select Category",
+                preview: "Preview",
+                budget_limit: "budget limit",
+                select_category: "Please select a category",
+                valid_amount: "Please enter a valid amount",
+                save_error: "Failed to save budget",
+                budget_created: "Budget created successfully!",
+                all_categories_have_budgets: "All Categories Have Budgets",
+                all_categories_subtitle: "You've created budgets for all available categories"
+            },
         }
     },
     ru: {
@@ -249,6 +355,7 @@ const resources = {
                 profile: "Профиль"
             },
             auth: {
+                enter_full_name: "Введите ваше полное имя",
                 welcome_back: "Добро пожаловать",
                 manage_finances: "Управляйте своими финансами с уверенностью",
                 start_journey: "Начните свой финансовый путь",
@@ -272,7 +379,11 @@ const resources = {
                 agree_terms: "Регистрируясь, вы соглашаетесь с нашими Условиями использования и",
                 privacy_policy: "Политикой конфиденциальности",
                 google: "Google",
-                apple: "Apple"
+                apple: "Apple",
+                fill_all_fields: "Пожалуйста, заполните все поля.",
+                login_error: "Неизвестная ошибка входа.",
+                login_error_title: "Ошибка входа",
+                network_error: "Не удалось подключиться к серверу.",
             },
             home: {
                 welcome_back: "С возвращением",
@@ -306,6 +417,7 @@ const resources = {
                 add_transaction: "Добавить транзакцию",
                 edit_transaction: "Редактировать транзакцию",
                 expense: "Расход",
+                income_label: "Доход",
                 category: "Категория",
                 date: "Дата",
                 note: "Заметка",
@@ -315,16 +427,21 @@ const resources = {
                 cash: "Наличные",
                 card: "Карта",
                 recurring_transaction: "Повторяющаяся транзакция",
+                recurring: "Повторяющаяся",
                 add_receipt: "Добавить фото чека",
                 save_transaction: "Сохранить транзакцию",
                 delete_transaction: "Удалить транзакцию",
                 confirm_delete: "Вы уверены, что хотите удалить эту транзакцию?",
                 description_required: "Описание не может быть пустым",
+                description: "Описание",
                 amount_required: "Введите корректную сумму",
+                amount: "Сумма",
                 category_required: "Выберите категорию",
                 method_required: "Выберите способ оплаты",
                 transaction_saved: "Транзакция успешно сохранена",
-                transaction_deleted: "Транзакция успешно удалена"
+                transaction_deleted: "Транзакция успешно удалена",
+                save_error: "Не удалось сохранить транзакцию",
+                delete_error: "Не удалось удалить транзакцию"
             },
             profile: {
                 title: "Профиль",
@@ -379,7 +496,10 @@ const resources = {
                 save_changes: "Сохранить изменения",
                 data_saved: "Данные успешно сохранены",
                 photo_updated: "Фото успешно обновлено",
-                gallery_permission: "Необходимо разрешение на доступ к галерее"
+                gallery_permission: "Необходимо разрешение на доступ к галерее",
+                load_error: "Не удалось загрузить данные профиля",
+                save_error: "Не удалось сохранить данные профиля",
+                photo_error: "Не удалось загрузить фото"
             },
             notifications: {
                 title: "Уведомления",
@@ -404,7 +524,26 @@ const resources = {
                 how_use: "Как мы используем вашу информацию",
                 data_security: "Безопасность данных",
                 your_rights: "Ваши права",
-                contact_us: "Свяжитесь с нами"
+                contact_us: "Свяжитесь с нами",
+                personal_info: "Личная идентификационная информация (имя, email адрес, номер телефона)",
+                financial_info: "Финансовая информация (история транзакций, балансы счетов)",
+                device_info: "Информация об устройстве и данные использования",
+                provide_service: "Для предоставления и поддержания нашего сервиса",
+                notify_changes: "Для уведомления вас об изменениях в нашем сервисе",
+                customer_support: "Для предоставления клиентской поддержки",
+                detect_issues: "Для обнаружения, предотвращения и устранения технических проблем",
+                security_intro: "Безопасность ваших данных важна для нас. Мы применяем соответствующие меры безопасности для защиты вашей личной информации, включая:",
+                encryption: "Шифрование конфиденциальных данных",
+                security_assessments: "Регулярные оценки безопасности",
+                secure_storage: "Безопасные системы хранения данных",
+                rights_intro: "У вас есть право:",
+                access_data: "Получить доступ к вашим личным данным",
+                correct_data: "Исправить ваши личные данные",
+                delete_data: "Запросить удаление ваших личных данных",
+                withdraw_consent: "Отозвать ваше согласие в любое время",
+                contact_intro: "Если у вас есть вопросы по этой Политике конфиденциальности, свяжитесь с нами:",
+                contact_email: "Email: privacy@financeapp.com",
+                contact_phone: "Телефон: +7 (708) 835-0549"
             },
             forgot_password: {
                 title: "Восстановление пароля",
@@ -417,7 +556,15 @@ const resources = {
                 new_password_field: "Новый пароль",
                 password_repeat: "Повторите пароль",
                 confirm: "Подтвердить",
-                back_to_recovery: "← Назад к восстановлению пароля"
+                back_to_recovery: "← Назад к восстановлению пароля",
+                email_required: "Пожалуйста, введите ваш email адрес.",
+                email_sent: "Если этот email зарегистрирован, на него придет ссылка для сброса.",
+                unknown_error: "Произошла неизвестная ошибка.",
+                network_error: "Не удалось подключиться к серверу.",
+                fill_all_fields: "Пожалуйста, заполните все поля.",
+                passwords_dont_match: "Пароли не совпадают.",
+                password_reset_success: "Пароль успешно сброшен.",
+                email_placeholder: "Ваш email"
             },
             language_screen: {
                 search_placeholder: "Поиск языков",
@@ -436,7 +583,72 @@ const resources = {
             transfer: {
                 title: "Переводы",
                 welcome: "Добро пожаловать на экран переводов"
-            }
+            },
+            budget: {
+                title: "Бюджет",
+                welcome: "Добро пожаловать на экран бюджета",
+                total_budget: "Общий бюджет",
+                spent: "Потрачено",
+                remaining: "Остается",
+                add_expense: "Добавить расход",
+                set_budget: "Установить бюджет",
+                analytics: "Аналитика",
+                budget_by_category: "Бюджет по категориям",
+                see_all: "Показать все",
+                insights: "Аналитика бюджета"
+            },
+            set_budget: {
+                title: "Установить бюджет",
+                monthly_budget: "Месячный бюджет",
+                used: "Использовано",
+                budget_categories: "Категории бюджета",
+                add_new_category: "Добавить новую категорию",
+                total_budget: "Общий бюджет",
+                remaining: "Остается",
+                spent: "Потрачено",
+                budget_saved: "Бюджет успешно сохранен!",
+                save_error: "Не удалось сохранить бюджет. Попробуйте еще раз."
+            },
+            analytics: {
+                title: "Аналитика бюджета",
+                total_budget: "Общий бюджет",
+                spent: "Потрачено",
+                monthly_overview: "Месячный обзор",
+                spending_by_category: "Расходы по категориям",
+                smart_insights: "Умные инсайты"
+            },
+            all_budgets: {
+                title: "Все бюджеты",
+                budget_summary: "Сводка бюджета",
+                total_limit: "Общий лимит",
+                total_spent: "Всего потрачено",
+                total_remaining: "Всего остается",
+                all_budgets: "Все бюджеты",
+                remaining: "Остается",
+                on_track: "В норме",
+                warning: "Предупреждение",
+                over_budget: "Превышен",
+                over_limit: "Превышен лимит",
+                delete_budget: "Удалить бюджет",
+                delete_confirmation: "Вы уверены, что хотите удалить этот бюджет?",
+                no_budgets: "Бюджетов пока нет",
+                create_first_budget: "Создайте свой первый бюджет для отслеживания расходов",
+                create_budget: "Создать бюджет"
+            },
+
+            create_budget: {
+                title: "Создать бюджет",
+                budget_amount: "Сумма бюджета",
+                select_category: "Выберите категорию",
+                preview: "Предпросмотр",
+                budget_limit: "лимит бюджета",
+                select_category: "Пожалуйста, выберите категорию",
+                valid_amount: "Пожалуйста, введите корректную сумму",
+                save_error: "Не удалось сохранить бюджет",
+                budget_created: "Бюджет успешно создан!",
+                all_categories_have_budgets: "Для всех категорий созданы бюджеты",
+                all_categories_subtitle: "Вы создали бюджеты для всех доступных категорий"
+            },
         }
     },
     kz: {
@@ -467,6 +679,7 @@ const resources = {
                 profile: "Профиль"
             },
             auth: {
+                enter_full_name: "Толық атыңызды енгізіңіз",
                 welcome_back: "Қайта келуіңізбен",
                 manage_finances: "Қаржыңызды сенімділікпен басқарыңыз",
                 start_journey: "Қаржылық сапарыңызды бастаңыз",
@@ -490,7 +703,11 @@ const resources = {
                 agree_terms: "Тіркелу арқылы біздің Қызмет шарттары мен келісесіз",
                 privacy_policy: "Құпиялылық саясаты",
                 google: "Google",
-                apple: "Apple"
+                apple: "Apple",
+                fill_all_fields: "Барлық өрістерді толтырыңыз.",
+                login_error: "Белгісіз кіру қатесі.",
+                login_error_title: "Кіру қатесі",
+                network_error: "Серверге қосылу мүмкін болмады.",
             },
             home: {
                 welcome_back: "Қайта келуіңізбен",
@@ -524,6 +741,7 @@ const resources = {
                 add_transaction: "Транзакция қосу",
                 edit_transaction: "Транзакцияны өңдеу",
                 expense: "Шығыс",
+                income_label: "Кіріс",
                 category: "Санат",
                 date: "Күні",
                 note: "Ескерту",
@@ -533,16 +751,21 @@ const resources = {
                 cash: "Нақты ақша",
                 card: "Карта",
                 recurring_transaction: "Қайталанатын транзакция",
+                recurring: "Қайталанатын",
                 add_receipt: "Чек фотосын қосу",
                 save_transaction: "Транзакцияны сақтау",
                 delete_transaction: "Транзакцияны жою",
                 confirm_delete: "Бұл транзакцияны жойғыңыз келетініне сенімдісіз бе?",
                 description_required: "Сипаттама бос болмауы керек",
+                description: "Сипаттама",
                 amount_required: "Дұрыс сомасын енгізіңіз",
+                amount: "Сомасы",
                 category_required: "Санатты таңдаңыз",
                 method_required: "Төлем әдісін таңдаңыз",
                 transaction_saved: "Транзакция сәтті сақталды",
-                transaction_deleted: "Транзакция сәтті жойылды"
+                transaction_deleted: "Транзакция сәтті жойылды",
+                save_error: "Транзакцияны сақтау мүмкін болмады",
+                delete_error: "Транзакцияны жою мүмкін болмады"
             },
             profile: {
                 title: "Профиль",
@@ -597,7 +820,10 @@ const resources = {
                 save_changes: "Өзгерістерді сақтау",
                 data_saved: "Деректер сәтті сақталды",
                 photo_updated: "Фото сәтті жаңартылды",
-                gallery_permission: "Галереяға қол жеткізу рұқсаты қажет"
+                gallery_permission: "Галереяға қол жеткізу рұқсаты қажет",
+                load_error: "Профиль деректерін жүктеу мүмкін болмады",
+                save_error: "Профиль деректерін сақтау мүмкін болмады",
+                photo_error: "Фотосын жүктеу мүмкін болмады"
             },
             notifications: {
                 title: "Хабарландырулар",
@@ -622,7 +848,26 @@ const resources = {
                 how_use: "Ақпаратты қалай пайдаланамыз",
                 data_security: "Деректер қауіпсіздігі",
                 your_rights: "Сіздің құқықтарыңыз",
-                contact_us: "Бізбен байланысыңыз"
+                contact_us: "Бізбен байланысыңыз",
+                personal_info: "Жеке сәйкестендіру ақпараты (аты, email мекенжайы, телефон нөмірі)",
+                financial_info: "Қаржылық ақпарат (транзакциялар тарихы, шот балансы)",
+                device_info: "Құрылғы ақпараты және пайдалану деректері",
+                provide_service: "Қызметімізді ұсыну және қолдау үшін",
+                notify_changes: "Қызметіміздегі өзгерістер туралы хабардар ету үшін",
+                customer_support: "Клиенттерге қолдау көрсету үшін",
+                detect_issues: "Техникалық мәселелерді анықтау, алдын алу және шешу үшін",
+                security_intro: "Деректеріңіздің қауіпсіздігі біз үшін маңызды. Біз жеке ақпаратыңызды қорғау үшін тиісті қауіпсіздік шараларын қабылдаймыз:",
+                encryption: "Құпия деректерді шифрлау",
+                security_assessments: "Қауіпсіздікті тұрақты бағалау",
+                secure_storage: "Қауіпсіз деректер сақтау жүйелері",
+                rights_intro: "Сіздің құқығыңыз бар:",
+                access_data: "Жеке деректеріңізге қол жеткізу",
+                correct_data: "Жеке деректеріңізді түзету",
+                delete_data: "Жеке деректеріңізді жою туралы сұрау",
+                withdraw_consent: "Келісіміңізді кез келген уақытта кері қайтару",
+                contact_intro: "Бұл Құпиялылық саясаты бойынша сұрақтарыңыз болса, бізбен байланысыңыз:",
+                contact_email: "Email: privacy@financeapp.com",
+                contact_phone: "Телефон: +7 (708) 835-0549",
             },
             forgot_password: {
                 title: "Құпия сөзді қалпына келтіру",
@@ -635,7 +880,15 @@ const resources = {
                 new_password_field: "Жаңа құпия сөз",
                 password_repeat: "Құпия сөзді қайталаңыз",
                 confirm: "Растау",
-                back_to_recovery: "← Құпия сөзді қалпына келтіруге оралу"
+                back_to_recovery: "← Құпия сөзді қалпына келтіруге оралу",
+                email_required: "Email мекенжайыңызды енгізіңіз.",
+                email_sent: "Егер бұл email тіркелген болса, оған қалпына келтіру сілтемесі жіберіледі.",
+                unknown_error: "Белгісіз қате орын алды.",
+                network_error: "Серверге қосылу мүмкін болмады.",
+                fill_all_fields: "Барлық өрістерді толтырыңыз.",
+                passwords_dont_match: "Құпия сөздер сәйкес келмейді.",
+                password_reset_success: "Құпия сөз сәтті қалпына келтірілді.",
+                email_placeholder: "Сіздің email"
             },
             language_screen: {
                 search_placeholder: "Тілдерді іздеу",
@@ -654,7 +907,72 @@ const resources = {
             transfer: {
                 title: "Аударымдар",
                 welcome: "Аударымдар экранына қош келдіңіз"
-            }
+            },
+            budget: {
+                title: "Бюджет",
+                welcome: "Бюджет экранына қош келдіңіз",
+                total_budget: "Жалпы бюджет",
+                spent: "Жұмсалған",
+                remaining: "Қалған",
+                add_expense: "Шығыс қосу",
+                set_budget: "Бюджет орнату",
+                analytics: "Аналитика",
+                budget_by_category: "Санат бойынша бюджет",
+                see_all: "Барлығын көру",
+                insights: "Бюджет талдауы"
+            },
+            set_budget: {
+                title: "Бюджет орнату",
+                monthly_budget: "Ай сайынғы бюджет",
+                used: "Пайдаланылған",
+                budget_categories: "Бюджет санаттары",
+                add_new_category: "Жаңа санат қосу",
+                total_budget: "Жалпы бюджет",
+                remaining: "Қалған",
+                spent: "Жұмсалған",
+                budget_saved: "Бюджет сәтті сақталды!",
+                save_error: "Бюджетті сақтау мүмкін болмады. Қайта көріңіз."
+            },
+            analytics: {
+                title: "Бюджет аналитикасы",
+                total_budget: "Жалпы бюджет",
+                spent: "Жұмсалған",
+                monthly_overview: "Ай сайынғы шолу",
+                spending_by_category: "Санат бойынша шығыстар",
+                smart_insights: "Ақылды талдау"
+            },
+            all_budgets: {
+                title: "Барлық бюджеттер",
+                budget_summary: "Бюджет қорытындысы",
+                total_limit: "Жалпы лимит",
+                total_spent: "Барлығы жұмсалған",
+                total_remaining: "Барлығы қалған",
+                all_budgets: "Барлық бюджеттер",
+                remaining: "Қалған",
+                on_track: "Қалыпты",
+                warning: "Ескерту",
+                over_budget: "Асып кетті",
+                over_limit: "Лимит асты",
+                delete_budget: "Бюджетті жою",
+                delete_confirmation: "Бұл бюджетті жойғыңыз келетініне сенімдісіз бе?",
+                no_budgets: "Бюджеттер әлі жоқ",
+                create_first_budget: "Шығыстарды бақылау үшін алғашқы бюджетіңізді жасаңыз",
+                create_budget: "Бюджет жасау"
+            },
+
+            create_budget: {
+                title: "Бюджет жасау",
+                budget_amount: "Бюджет сомасы",
+                select_category: "Санатты таңдаңыз",
+                preview: "Алдын ала көру",
+                budget_limit: "бюджет лимиті",
+                select_category: "Санатты таңдаңыз",
+                valid_amount: "Дұрыс сомасын енгізіңіз",
+                save_error: "Бюджетті сақтау мүмкін болмады",
+                budget_created: "Бюджет сәтті жасалды!",
+                all_categories_have_budgets: "Барлық санаттар үшін бюджеттер бар",
+                all_categories_subtitle: "Сіз барлық қол жетімді санаттар үшін бюджеттер жасадыңыз"
+            },
         }
     }
 };
