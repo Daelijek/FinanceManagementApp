@@ -1,31 +1,36 @@
-# app/main.py (исправленная версия для on_event)
+# app/main.py
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.v1.router import api_router
+from app.utils.scheduler import setup_scheduler
+
+# Глобальная переменная для планировщика
+scheduler = None
 
 
-# Лайфспан событие (замена для on_event)
+# Лайфспан событие
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Действия при запуске
     print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}...")
 
-    # Здесь можно добавить:
-    # - Создание таблиц БД
-    # - Инициализация кеша
-    # - Подключение к внешним сервисам
+    # Запускаем планировщик задач
+    global scheduler
+    scheduler = setup_scheduler()
+    scheduler.start()
+    print("Background task scheduler started")
 
     yield  # Здесь приложение работает
 
     # Действия при остановке
     print("Shutting down...")
 
-    # Здесь можно добавить:
-    # - Закрытие соединений
-    # - Сохранение состояния
-    # - Очистка ресурсов
+    # Останавливаем планировщик задач
+    if scheduler:
+        scheduler.shutdown()
+        print("Background task scheduler stopped")
 
 
 # Создание приложения

@@ -1,11 +1,15 @@
 # app/services/user.py
 from typing import Optional
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 from app.models.user import User
 from app.schemas.user import UserUpdate, UserPersonalInfo
 from app.utils.security import SecurityUtils
 from datetime import datetime
+import os
+import uuid
+from app.config import settings
+
 
 
 class UserService:
@@ -59,6 +63,39 @@ class UserService:
         db.commit()
         db.refresh(user)
         return user
+
+    @staticmethod
+    async def upload_profile_photo(user_id: int, file: UploadFile, db: Session) -> str:
+        """Загрузка фото профиля пользователя"""
+        user = await UserService.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Директория для хранения файлов
+        upload_dir = f"{settings.UPLOAD_DIR}/profile_photos/{user_id}"
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Генерируем уникальное имя файла
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = f"{upload_dir}/{unique_filename}"
+
+        # Сохраняем файл
+        content = await file.read()
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+
+        # Относительный путь для сохранения в БД
+        relative_path = f"/profile_photos/{user_id}/{unique_filename}"
+
+        # Обновляем URL фото пользователя
+        user.profile_photo_url = relative_path
+        db.commit()
+
+        return relative_path
 
     @staticmethod
     async def delete_user(user_id: int, db: Session) -> None:

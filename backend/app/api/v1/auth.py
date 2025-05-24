@@ -8,12 +8,15 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
-    OAuthLoginRequest
+    OAuthLoginRequest,
+    OAuthInitRequest
 )
 from app.schemas.user import UserCreate, UserResponse
 from app.services.auth import AuthService
 from app.utils.dependencies import get_current_user
 from app.models.user import User
+from app.config import settings
+import urllib.parse
 
 router = APIRouter(
     prefix="/auth",
@@ -55,10 +58,61 @@ async def refresh_token(
     return token
 
 
+@router.post("/oauth/init")
+async def oauth_init(
+        oauth_data: OAuthInitRequest
+):
+    """Инициация OAuth процесса"""
+    if oauth_data.provider == "google":
+        if not settings.GOOGLE_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Google OAuth not configured"
+            )
+
+        # Генерация URL для Google OAuth
+        params = {
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'redirect_uri': oauth_data.redirect_uri,
+            'response_type': 'code',
+            'scope': 'email profile',
+            'access_type': 'offline',
+            'prompt': 'consent'
+        }
+
+        auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urllib.parse.urlencode(params)}"
+        return {"auth_url": auth_url}
+
+    elif oauth_data.provider == "microsoft":
+        if not settings.MICROSOFT_CLIENT_ID:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Microsoft OAuth not configured"
+            )
+
+        # Генерация URL для Microsoft OAuth
+        params = {
+            'client_id': settings.MICROSOFT_CLIENT_ID,
+            'redirect_uri': oauth_data.redirect_uri,
+            'response_type': 'code',
+            'scope': 'openid profile email User.Read',
+            'response_mode': 'query'
+        }
+
+        auth_url = f"https://login.microsoftonline.com/{settings.MICROSOFT_TENANT}/oauth2/v2.0/authorize?{urllib.parse.urlencode(params)}"
+        return {"auth_url": auth_url}
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OAuth provider"
+        )
+
+
 @router.post("/oauth/login", response_model=Token)
 async def oauth_login(
-    oauth_data: OAuthLoginRequest,
-    db: Session = Depends(get_db)
+        oauth_data: OAuthLoginRequest,
+        db: Session = Depends(get_db)
 ):
     """OAuth вход/регистрация"""
     token = await AuthService.oauth_login(oauth_data, db)

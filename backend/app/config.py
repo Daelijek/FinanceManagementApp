@@ -1,11 +1,10 @@
 # app/config.py
-
 from pydantic_settings import BaseSettings
-from pydantic import EmailStr
-from typing import List, Optional
+from typing import Optional
+
 
 class Settings(BaseSettings):
-    # Основные
+    # Основные настройки
     PROJECT_NAME: str = "Financial App Backend"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
@@ -24,33 +23,33 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:8081",
-    ]
+    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
 
-    # Email (сброс пароля)
-    SMTP_HOST: str
-    SMTP_PORT: int
-    SMTP_USER: EmailStr
-    SMTP_PASSWORD: str
-    EMAILS_FROM_EMAIL: EmailStr
-    SMTP_TLS: bool = True
-    SMTP_SSL: bool = False
+    # Email (для сброса пароля)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: Optional[int] = None
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAILS_FROM_EMAIL: Optional[str] = None
 
-    # Время жизни reset-токена (в часах)
-    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
-
-    # OAuth (Google и Apple)
+    # OAuth (Google)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
-    APPLE_CLIENT_ID: Optional[str] = None
-    APPLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: Optional[str] = None
+
+    # OAuth (Microsoft)
+    MICROSOFT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_CLIENT_SECRET: Optional[str] = None
+    MICROSOFT_REDIRECT_URI: Optional[str] = None
+    MICROSOFT_TENANT: str = "common"  # common, organizations, consumers, <tenant_id>
+
+    # Настройки для загрузки файлов
+    UPLOAD_DIR: str = "uploads"
+    MAX_UPLOAD_SIZE: int = 10_485_760  # 10 МБ
 
     class Config:
         env_file = ".env"
         case_sensitive = True
-        extra = "ignore"  # игнорировать «лишние» переменные
 
-# глобальный экземпляр настроек
+
 settings = Settings()

@@ -1,34 +1,26 @@
 # app/services/auth.py
-
 from datetime import datetime, timedelta
-from typing import Optional
-
+from typing import Optional, Dict
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-
 from app.models.user import User
-from app.schemas.auth import Token, OAuthLoginRequest, PasswordResetRequest, PasswordResetConfirm
+from app.schemas.auth import Token, OAuthLoginRequest
 from app.schemas.user import UserCreate, UserOAuthCreate
 from app.utils.security import SecurityUtils
 from app.config import settings
-
 from app.services.profile import ProfileService
 from app.schemas.profile import ProfileCreate, FinancialDataCreate
 from app.models.financial import SubscriptionTypeEnum
-
-# Для OAuth Google
-import httpx
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
-
-# Для отправки писем
-from app.utils.mailer import send_reset_email
+from app.utils.oauth import GoogleOAuth, MicrosoftOAuth
+import os
+import uuid
 
 
 class AuthService:
     @staticmethod
     async def register_user(user_data: UserCreate, db: Session) -> User:
         """Регистрация нового пользователя"""
+        # Проверяем, существует ли пользователь
         existing_user = db.query(User).filter(User.email == user_data.email).first()
         if existing_user:
             raise HTTPException(
@@ -36,6 +28,7 @@ class AuthService:
                 detail="Email already registered"
             )
 
+        # Валидация пароля
         is_strong, message = SecurityUtils.password_strength_validator(user_data.password)
         if not is_strong:
             raise HTTPException(
@@ -43,6 +36,7 @@ class AuthService:
                 detail=message
             )
 
+        # Создаем пользователя
         hashed_password = SecurityUtils.get_password_hash(user_data.password)
         user = User(
             email=user_data.email,
@@ -54,26 +48,29 @@ class AuthService:
         db.commit()
         db.refresh(user)
 
-        # Создаём профиль и финансовые данные
-        profile = await ProfileService.create_profile(user.id, ProfileCreate(), db)
-        expires_at = datetime.utcnow() + timedelta(days=365)
-        await ProfileService.update_subscription(
-            user.id,
-            SubscriptionTypeEnum.FREE,
-            expires_at,
-            db
-        )
-        await ProfileService.create_financial_data(
-            profile.id,
-            FinancialDataCreate(balance=0.0, savings=0.0, credit_score=0),
-            db
-        )
+        # Создаем профиль с бесплатной подпиской
+        profile_data = ProfileCreate()
+        profile = await ProfileService.create_profile(user.id, profile_data, db)
 
+        # Устанавливаем тип подписки и срок действия
+        expires_at = datetime.utcnow() + timedelta(days=365)  # Бесплатно на год
+        await ProfileService.update_subscription(user.id, SubscriptionTypeEnum.FREE, expires_at, db)
+
+        # Создаем начальные финансовые данные
+        financial_data = FinancialDataCreate(
+            balance=0.0,
+            savings=0.0,
+            credit_score=0
+        )
+        await ProfileService.create_financial_data(profile.id, financial_data, db)
+
+        # Возвращаем пользователя
         return user
 
     @staticmethod
     async def login_user(email: str, password: str, db: Session) -> Token:
         """Вход пользователя"""
+        # Находим пользователя
         user = db.query(User).filter(User.email == email).first()
         if not user or not user.hashed_password:
             raise HTTPException(
@@ -81,26 +78,33 @@ class AuthService:
                 detail="Incorrect email or password"
             )
 
+        # Проверяем пароль
         if not SecurityUtils.verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect email or password"
             )
 
+        # Проверяем активность пользователя
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Inactive user"
             )
 
+        # Создаем токены
         access_token = SecurityUtils.create_access_token(data={"sub": str(user.id)})
         refresh_token = SecurityUtils.create_refresh_token(data={"sub": str(user.id)})
 
-        return Token(access_token=access_token, refresh_token=refresh_token)
+        return Token(
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
 
     @staticmethod
     async def refresh_token(refresh_token: str, db: Session) -> Token:
         """Обновление токенов"""
+        # Декодируем refresh токен
         payload = SecurityUtils.decode_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
             raise HTTPException(
@@ -116,101 +120,178 @@ class AuthService:
                 detail="Invalid user"
             )
 
+        # Создаем новые токены
         access_token = SecurityUtils.create_access_token(data={"sub": str(user.id)})
         new_refresh_token = SecurityUtils.create_refresh_token(data={"sub": str(user.id)})
 
-        return Token(access_token=access_token, refresh_token=new_refresh_token)
+        return Token(
+            access_token=access_token,
+            refresh_token=new_refresh_token
+        )
 
     @staticmethod
     async def oauth_login(oauth_data: OAuthLoginRequest, db: Session) -> Token:
         """OAuth вход/регистрация"""
-        if oauth_data.provider == "google":
-            user_info = await AuthService._verify_google_token(oauth_data.id_token)
-        elif oauth_data.provider == "apple":
-            user_info = await AuthService._verify_apple_token(oauth_data.id_token)
-        else:
+        user_info = None
+
+        try:
+            if oauth_data.provider == "google":
+                # Получение токена из кода авторизации и проверка
+                if oauth_data.redirect_uri:
+                    token_data = await GoogleOAuth.get_token_from_code(
+                        oauth_data.token,
+                        oauth_data.redirect_uri
+                    )
+                    user_info = token_data["user_info"]
+                else:
+                    # Используем переданный ID token напрямую
+                    user_info = await GoogleOAuth.verify_token(oauth_data.token)
+
+            elif oauth_data.provider == "microsoft":
+                # Получение токена из кода авторизации и проверка
+                token_data = await MicrosoftOAuth.get_token_from_code(
+                    oauth_data.token,
+                    oauth_data.redirect_uri
+                )
+                user_info = token_data["user_info"]
+
+                # Получаем и сохраняем фото профиля, если оно доступно
+                if "access_token" in token_data:
+                    profile_photo = await MicrosoftOAuth.get_profile_photo(token_data["access_token"])
+                    if profile_photo:
+                        # Сохраняем фото профиля во временный файл
+                        photo_url = await AuthService._save_profile_photo(profile_photo, user_info["sub"])
+                        user_info["picture"] = photo_url
+
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid OAuth provider"
+                )
+        except ValueError as e:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OAuth provider"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e)
             )
 
         if not user_info:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid OAuth token"
+                detail="Failed to get user info from provider"
             )
 
-        user = db.query(User).filter(User.email == user_info["email"]).first()
+        # Обязательно должен быть email или sub
+        if not user_info.get("email") and not user_info.get("sub"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User email or ID not provided by OAuth provider"
+            )
+
+        # Ищем пользователя сначала по OAuth ID
+        user = None
+        if user_info.get("sub"):
+            user = db.query(User).filter(
+                User.oauth_provider == oauth_data.provider,
+                User.oauth_id == user_info["sub"]
+            ).first()
+
+        # Затем по email, если пользователь не найден и email предоставлен
+        if not user and user_info.get("email"):
+            user = db.query(User).filter(User.email == user_info["email"]).first()
+
         if not user:
+            # Создаем нового пользователя
+            name = user_info.get("name", "")
+            email = user_info.get("email", f"{user_info['sub']}@{oauth_data.provider}.user")
+
             user = User(
-                email=user_info["email"],
-                full_name=user_info.get("name", ""),
+                email=email,
+                full_name=name,
                 oauth_provider=oauth_data.provider,
                 oauth_id=user_info["sub"],
-                is_verified=True
+                is_verified=True,  # OAuth пользователи считаются верифицированными
+                profile_photo_url=user_info.get("picture")
             )
             db.add(user)
             db.commit()
             db.refresh(user)
+
+            # Создаем профиль и финансовые данные
+            profile_data = ProfileCreate()
+            profile = await ProfileService.create_profile(user.id, profile_data, db)
+
+            # Устанавливаем тип подписки
+            expires_at = datetime.utcnow() + timedelta(days=365)
+            await ProfileService.update_subscription(user.id, SubscriptionTypeEnum.FREE, expires_at, db)
+
+            # Создаем финансовые данные
+            financial_data = FinancialDataCreate(
+                balance=0.0,
+                savings=0.0,
+                credit_score=0
+            )
+            await ProfileService.create_financial_data(profile.id, financial_data, db)
+
         else:
+            # Обновляем данные существующего пользователя
             if not user.oauth_provider:
                 user.oauth_provider = oauth_data.provider
                 user.oauth_id = user_info["sub"]
-                db.commit()
 
+            # Обновляем фото профиля, если предоставлено
+            if user_info.get("picture") and user.profile_photo_url != user_info["picture"]:
+                user.profile_photo_url = user_info["picture"]
+
+            db.commit()
+
+        # Создаем токены
         access_token = SecurityUtils.create_access_token(data={"sub": str(user.id)})
         refresh_token = SecurityUtils.create_refresh_token(data={"sub": str(user.id)})
 
-        return Token(access_token=access_token, refresh_token=refresh_token)
+        return Token(
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
 
     @staticmethod
-    async def _verify_google_token(token: str) -> Optional[dict]:
-        """Верификация Google токена"""
-        try:
-            idinfo = id_token.verify_oauth2_token(
-                token,
-                google_requests.Request(),
-                settings.GOOGLE_CLIENT_ID
-            )
-            return {
-                "email": idinfo["email"],
-                "name": idinfo.get("name", ""),
-                "sub": idinfo["sub"]
-            }
-        except ValueError:
-            return None
+    async def _save_profile_photo(photo_data: bytes, user_identifier: str) -> str:
+        """Сохранение фото профиля из OAuth провайдера"""
+        # Создаем директорию для хранения фото
+        upload_dir = f"{settings.UPLOAD_DIR}/profile_photos"
+        os.makedirs(upload_dir, exist_ok=True)
 
-    @staticmethod
-    async def _verify_apple_token(token: str) -> Optional[dict]:
-        """Верификация Apple токена (заглушка)"""
-        # TODO: добавить логику проверки Apple ID token
-        return None
+        # Генерируем уникальное имя файла
+        unique_filename = f"{uuid.uuid4()}.jpg"
+        file_path = f"{upload_dir}/{unique_filename}"
+
+        # Сохраняем файл
+        with open(file_path, "wb") as buffer:
+            buffer.write(photo_data)
+
+        # Возвращаем относительный путь
+        return f"/profile_photos/{unique_filename}"
 
     @staticmethod
     async def request_password_reset(email: str, db: Session) -> None:
         """Запрос на сброс пароля"""
         user = db.query(User).filter(User.email == email).first()
         if not user:
-            return  # безопасность: не даём знать, есть ли такая учётка
+            # Не раскрываем информацию о существовании пользователя
+            return
 
-        # Генерация и сохранение токена
+        # Генерируем токен сброса
         reset_token = SecurityUtils.generate_reset_token()
         user.reset_password_token = reset_token
-        user.reset_password_token_expires = (
-            datetime.utcnow() + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
-        )
+        user.reset_password_token_expires = datetime.utcnow() + timedelta(hours=1)
+
         db.commit()
 
-        # Отправка письма
-        try:
-            await send_reset_email(user.email, reset_token)
-            print(f"[INFO] Reset email sent to {user.email}")
-        except Exception as e:
-            print(f"[WARNING] Could not send reset email: {e}")
+        # Здесь должна быть отправка email с токеном
+        # TODO: Implement email sending
 
     @staticmethod
     async def reset_password(token: str, new_password: str, db: Session) -> None:
-        """Подтверждение сброса пароля"""
+        """Сброс пароля"""
         user = db.query(User).filter(
             User.reset_password_token == token,
             User.reset_password_token_expires > datetime.utcnow()
@@ -222,6 +303,7 @@ class AuthService:
                 detail="Invalid or expired reset token"
             )
 
+        # Валидация нового пароля
         is_strong, message = SecurityUtils.password_strength_validator(new_password)
         if not is_strong:
             raise HTTPException(
@@ -229,7 +311,9 @@ class AuthService:
                 detail=message
             )
 
+        # Обновляем пароль
         user.hashed_password = SecurityUtils.get_password_hash(new_password)
         user.reset_password_token = None
         user.reset_password_token_expires = None
+
         db.commit()
