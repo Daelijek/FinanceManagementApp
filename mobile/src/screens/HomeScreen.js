@@ -52,6 +52,9 @@ const HomeScreen = ({ navigation }) => {
     datasets: [{ data: [] }],
   });
 
+  const [budgets, setBudgets] = useState([]);
+  const [loadingBudgets, setLoadingBudgets] = useState(false);
+
   const fetchTransactions = useCallback(async () => {
     try {
       const resTx = await apiFetch("/api/v1/transactions/?skip=0&limit=100");
@@ -232,13 +235,28 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [fetchAllTransactionsAndCalculateBalance]);
 
+  const fetchBudgets = useCallback(async () => {
+    setLoadingBudgets(true);
+    try {
+      const response = await apiFetch("/api/v1/budgets/current-month");
+      if (!response.ok) throw new Error("Failed to load budgets");
+      const data = await response.json();
+      setBudgets(data.budgets_by_category || []);
+    } catch (error) {
+      console.error("Ошибка загрузки бюджетов:", error);
+    } finally {
+      setLoadingBudgets(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchTransactions();
       fetchBalancesForComparison();
       fetchTotalBalance();
       fetchExpensesForChart();
-    }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart])
+      fetchBudgets();
+    }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets])
   );
 
   useEffect(() => {
@@ -246,7 +264,8 @@ const HomeScreen = ({ navigation }) => {
     fetchBalancesForComparison();
     fetchTotalBalance();
     fetchExpensesForChart();
-  }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart]);
+    fetchBudgets();
+  }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets]);
 
   const onProfile = () => navigation.navigate("Profile");
   const onTransactionAdd = () => navigation.navigate("Transaction Add");
@@ -255,13 +274,6 @@ const HomeScreen = ({ navigation }) => {
   const onTransfer = () => navigation.navigate("Transfer");
   const onNotifications = () => navigation.navigate("Notifications");
   const onAllTransactions = () => navigation.navigate("All Transactions");
-
-  const budgetData = [
-    { category: "Shopping", spent: 820, total: 1000, color: "#2563EB" },
-    { category: "Food", spent: 450, total: 600, color: "#F59E0B" },
-    { category: "Transport", spent: 200, total: 400, color: "#22C55E" },
-    { category: "Body-Massage", spent: 9800, total: 15000, color: "#8B5CF6" },
-  ];
 
   const renderBalanceChange = () => {
     if (balanceChange === null) {
@@ -429,28 +441,36 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.budgetOverviewText}>{t('home.budget_overview')}</Text>
             </View>
             <View style={styles.budgetList}>
-              {budgetData.map((item, index) => {
-                const progress = item.spent / item.total;
-                return (
-                  <View key={index} style={styles.budgetItem}>
-                    <View style={styles.budgetItemHeader}>
-                      <Text style={styles.budgetCategory}>{item.category}</Text>
-                      <Text style={styles.budgetAmount}>
-                        ${item.spent} / ${item.total}
-                      </Text>
+              {loadingBudgets ? (
+                <ActivityIndicator size="large" color="#2563EB" />
+              ) : budgets.length === 0 ? (
+                <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
+                  {t('home.no_budgets')}
+                </Text>
+              ) : (
+                budgets.map((item) => {
+                  const progress = item.spent_amount / item.amount;
+                  return (
+                    <View key={item.id} style={styles.budgetItem}>
+                      <View style={styles.budgetItemHeader}>
+                        <Text style={styles.budgetCategory}>{item.category_name}</Text>
+                        <Text style={styles.budgetAmount}>
+                          ${item.spent_amount} / ${item.amount}
+                        </Text>
+                      </View>
+                      <Progress.Bar
+                        progress={progress > 1 ? 1 : progress}
+                        width={null}
+                        height={8}
+                        color={item.category_color || "#2563EB"}
+                        unfilledColor="#F3F4F6"
+                        borderWidth={0}
+                        style={{ marginTop: 8 }}
+                      />
                     </View>
-                    <Progress.Bar
-                      progress={progress}
-                      width={null}
-                      height={8}
-                      color={item.color}
-                      unfilledColor="#F3F4F6"
-                      borderWidth={0}
-                      style={{ marginTop: 8 }}
-                    />
-                  </View>
-                );
-              })}
+                  );
+                })
+              )}
             </View>
           </View>
 
@@ -677,7 +697,6 @@ const getThemedStyles = (isDark) =>
     budgetOverview: {
       backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
       padding: 20,
-      height: 270,
       marginBottom: 24,
     },
     budgetOverviewText: {
@@ -686,8 +705,6 @@ const getThemedStyles = (isDark) =>
       color: isDark ? "#F3F4F6" : "#000",
     },
     budgetList: {
-      flex: 1,
-      justifyContent: "space-around",
       marginTop: 16,
     },
     budgetItemHeader: {

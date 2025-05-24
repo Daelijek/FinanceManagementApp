@@ -1,6 +1,6 @@
 // src/screens/AnalyticsScreen.js
 
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useCallback } from "react";
 import {
     StyleSheet,
     Text,
@@ -9,6 +9,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Dimensions,
+    ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import * as Progress from "react-native-progress";
 import { LineChart } from "react-native-chart-kit";
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
+import { apiFetch } from "../api";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -28,101 +30,89 @@ const AnalyticsScreen = ({ navigation }) => {
     const isDark = theme === "dark";
     const styles = getThemedStyles(isDark);
 
-    const [budgetData] = useState({
-        totalBudget: 5000,
-        spent: 3250,
-    });
+    const [budgetData, setBudgetData] = useState(null);
+    const [categories, setCategories] = useState([]);
+    const [loading, setLoading] = useState(false);
 
-    const [chartData] = useState({
-        labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+    const [chartData, setChartData] = useState({
+        labels: [],
         datasets: [
             {
-                data: [2800, 2600, 3100, 2400, 3200, 3250],
+                data: [],
                 color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
                 strokeWidth: 3,
             },
         ],
     });
 
-    const [categories] = useState([
-        {
-            id: 1,
-            name: "Housing",
-            icon: "home",
-            color: "#8B5CF6",
-            spent: 1500,
-            budget: 1800,
-            percentage: 83,
-            iconBg: "#F3E8FF"
-        },
-        {
-            id: 2,
-            name: "Food",
-            icon: "restaurant",
-            color: "#10B981",
-            spent: 600,
-            budget: 800,
-            percentage: 75,
-            iconBg: "#D1FAE5"
-        },
-        {
-            id: 3,
-            name: "Transportation",
-            icon: "car",
-            color: "#F59E0B",
-            spent: 400,
-            budget: 500,
-            percentage: 80,
-            iconBg: "#FEF3C7"
-        },
-        {
-            id: 4,
-            name: "Entertainment",
-            icon: "game-controller",
-            color: "#EC4899",
-            spent: 300,
-            budget: 400,
-            percentage: 75,
-            iconBg: "#FCE7F3"
-        },
-        {
-            id: 5,
-            name: "Shopping",
-            icon: "bag",
-            color: "#8B5CF6",
-            spent: 450,
-            budget: 500,
-            percentage: 90,
-            iconBg: "#F3E8FF"
-        }
-    ]);
+    const fetchBudgetData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await apiFetch("/api/v1/budgets/current-month");
+            if (!response.ok) throw new Error("Failed to fetch budgets");
+            const data = await response.json();
 
-    const [insights] = useState([
-        {
-            id: 1,
-            type: "positive",
-            icon: "trending-down",
-            text: "15% less spending than last month",
-            color: "#10B981",
-            bgColor: "#D1FAE5"
-        },
-        {
-            id: 2,
-            type: "neutral",
-            icon: "trending-down",
-            text: "Housing under budget by $300",
-            color: "#2563EB",
-            bgColor: "#EFF6FF"
-        },
-        {
-            id: 3,
-            type: "warning",
-            icon: "trending-up",
-            text: "Entertainment over budget by $50",
-            color: "#EF4444",
-            bgColor: "#FEE2E2"
+            const totalBudget = data.total_budget || 0;
+            const totalSpent = data.spent || 0;
+            setBudgetData({ totalBudget, spent: totalSpent });
+
+            const cats = (data.budgets_by_category || []).map(b => ({
+                id: b.category_id,
+                name: b.category_name,
+                icon: b.category_icon,
+                color: b.category_color,
+                spent: b.spent_amount,
+                budget: b.amount,
+                percentage: b.usage_percentage,
+                iconBg: b.category_color ? `${b.category_color}33` : "#ccc33",
+            }));
+
+            setCategories(cats);
+        } catch (error) {
+            console.error("Ошибка загрузки бюджета:", error);
+        } finally {
+            setLoading(false);
         }
-    ]);
+    }, []);
+
+    const fetchDailyOverview = useCallback(async () => {
+        try {
+            const daysToFetch = 7;
+            const today = new Date();
+            let dailyTotals = {};
+
+            for (let i = daysToFetch - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateString = date.toISOString().slice(0, 10);
+
+                const res = await apiFetch(
+                    `/api/v1/transactions/?transaction_type=expense&start_date=${dateString}&end_date=${dateString}&limit=1000`
+                );
+                if (!res.ok) throw new Error("Ошибка загрузки расходов");
+                const data = await res.json();
+                const total = data.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+                const dayLabel = date.getDate().toString();
+                dailyTotals[dayLabel] = total;
+            }
+
+            const labels = Object.keys(dailyTotals);
+            const dataPoints = Object.values(dailyTotals);
+
+            setChartData({
+                labels,
+                datasets: [{ data: dataPoints, color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`, strokeWidth: 3 }]
+            });
+        } catch (error) {
+            console.error("Ошибка загрузки daily overview:", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchBudgetData();
+        fetchDailyOverview();
+    }, [fetchBudgetData, fetchDailyOverview]);
 
     const chartConfig = {
         backgroundColor: isDark ? "#1F2937" : "#ffffff",
@@ -151,139 +141,130 @@ const AnalyticsScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>{t('analytics.title')}</Text>
-                <TouchableOpacity>
-                    <Ionicons name="menu-outline" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
-                </TouchableOpacity>
-            </View>
-
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Budget Cards */}
-                <View style={styles.budgetCards}>
-                    <View style={styles.budgetCard}>
-                        <LinearGradient
-                            colors={["#2563EB", "#3B82F6"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.cardGradient}
-                        >
-                            <Text style={styles.cardLabel}>{t('analytics.total_budget')}</Text>
-                            <Text style={styles.cardAmount}>${budgetData.totalBudget.toLocaleString()}</Text>
-                            <View style={styles.cardProgress}>
-                                <View style={styles.progressLine} />
-                            </View>
-                        </LinearGradient>
-                    </View>
+                {loading ? (
+                    <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 20 }} />
+                ) : budgetData ? (
+                    <View style={styles.budgetCards}>
+                        <View style={styles.budgetCard}>
+                            <LinearGradient
+                                colors={["#2563EB", "#3B82F6"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.cardGradient}
+                            >
+                                <Text style={styles.cardLabel}>{t('analytics.total_budget')}</Text>
+                                <Text style={styles.cardAmount}>${budgetData.totalBudget.toLocaleString()}</Text>
+                                <View style={styles.cardProgress}>
+                                    <View style={[styles.progressLine, { width: "100%" }]} />
+                                </View>
+                            </LinearGradient>
+                        </View>
 
-                    <View style={styles.budgetCard}>
-                        <LinearGradient
-                            colors={["#10B981", "#059669"]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.cardGradient}
-                        >
-                            <Text style={styles.cardLabel}>{t('analytics.spent')}</Text>
-                            <Text style={styles.cardAmount}>${budgetData.spent.toLocaleString()}</Text>
-                            <View style={styles.cardProgress}>
-                                <View style={styles.progressLine} />
-                            </View>
-                        </LinearGradient>
+                        <View style={styles.budgetCard}>
+                            <LinearGradient
+                                colors={["#10B981", "#059669"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.cardGradient}
+                            >
+                                <Text style={styles.cardLabel}>{t('analytics.spent')}</Text>
+                                <Text style={styles.cardAmount}>${budgetData.spent.toLocaleString()}</Text>
+                                <View style={styles.cardProgress}>
+                                    <View
+                                        style={[
+                                            styles.progressLine,
+                                            {
+                                                width:
+                                                    budgetData.totalBudget > 0
+                                                        ? `${(budgetData.spent / budgetData.totalBudget) * 100}%`
+                                                        : "0%",
+                                            },
+                                        ]}
+                                    />
+                                </View>
+                            </LinearGradient>
+                        </View>
                     </View>
-                </View>
+                ) : null}
 
-                {/* Monthly Overview Chart */}
                 <View style={styles.chartSection}>
                     <Text style={styles.sectionTitle}>{t('analytics.monthly_overview')}</Text>
                     <View style={styles.chartContainer}>
-                        <LineChart
-                            data={chartData}
-                            width={screenWidth - 40}
-                            height={220}
-                            chartConfig={chartConfig}
-                            bezier
-                            style={styles.chart}
-                            withInnerLines={true}
-                            withOuterLines={false}
-                            withVerticalLines={false}
-                            withHorizontalLines={true}
-                            withDots={true}
-                            withShadow={false}
-                            fromZero={false}
-                        />
+                        {chartData.labels.length === 0 ? (
+                            <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
+                                {t('analytics.no_data')}
+                            </Text>
+                        ) : (
+                            <LineChart
+                                data={chartData}
+                                width={screenWidth - 40}
+                                height={220}
+                                chartConfig={chartConfig}
+                                bezier
+                                style={styles.chart}
+                                withInnerLines={true}
+                                withOuterLines={false}
+                                withVerticalLines={false}
+                                withHorizontalLines={true}
+                                withDots={true}
+                                withShadow={false}
+                                fromZero={false}
+                            />
+                        )}
                     </View>
                 </View>
 
-                {/* Spending by Category */}
                 <View style={styles.categorySection}>
                     <Text style={styles.sectionTitle}>{t('analytics.spending_by_category')}</Text>
-
-                    <View style={styles.categoriesList}>
-                        {categories.map((category) => {
-                            const Icon = IconCmp(category.icon);
-
-                            return (
-                                <View key={category.id} style={styles.categoryItem}>
-                                    <View style={styles.categoryLeft}>
-                                        <View style={[styles.categoryIcon, { backgroundColor: category.iconBg }]}>
-                                            <Icon
-                                                name={category.icon}
-                                                size={20}
-                                                color={category.color}
-                                            />
-                                        </View>
-                                        <View style={styles.categoryInfo}>
-                                            <Text style={styles.categoryName}>{category.name}</Text>
-                                            <Text style={styles.categoryAmount}>
-                                                $ {category.spent} / $ {category.budget}
-                                            </Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.categoryRight}>
-                                        <Text style={styles.categoryPercentage}>{category.percentage} %</Text>
-                                        <View style={styles.categoryProgressContainer}>
-                                            <Progress.Bar
-                                                progress={category.percentage / 100}
-                                                width={120}
-                                                height={4}
-                                                color={category.color}
-                                                unfilledColor={isDark ? "#374151" : "#F3F4F6"}
-                                                borderWidth={0}
-                                                borderRadius={2}
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* Smart Insights */}
-                <View style={styles.insightsSection}>
-                    <Text style={styles.sectionTitle}>{t('analytics.smart_insights')}</Text>
-
-                    <View style={styles.insightsList}>
-                        {insights.map((insight) => (
-                            <View key={insight.id} style={[styles.insightItem, { backgroundColor: insight.bgColor }]}>
-                                <View style={styles.insightIcon}>
-                                    <Ionicons
-                                        name={insight.icon}
-                                        size={16}
-                                        color={insight.color}
-                                    />
-                                </View>
-                                <Text style={[styles.insightText, { color: insight.color }]}>
-                                    {insight.text}
+                    {loading ? (
+                        <ActivityIndicator size="large" color="#2563EB" style={{ marginVertical: 20 }} />
+                    ) : (
+                        <View style={styles.categoriesList}>
+                            {categories.length === 0 ? (
+                                <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
+                                    {t('analytics.no_categories')}
                                 </Text>
-                            </View>
-                        ))}
-                    </View>
+                            ) : categories.map((category) => {
+                                const Icon = IconCmp(category.icon);
+
+                                return (
+                                    <View key={category.id} style={styles.categoryItem}>
+                                        <View style={styles.categoryLeft}>
+                                            <View style={[styles.categoryIcon, { backgroundColor: category.iconBg }]}>
+                                                <Icon
+                                                    name={category.icon}
+                                                    size={20}
+                                                    color={category.color}
+                                                />
+                                            </View>
+                                            <View style={styles.categoryInfo}>
+                                                <Text style={styles.categoryName}>{category.name}</Text>
+                                                <Text style={styles.categoryAmount}>
+                                                    $ {category.spent} / $ {category.budget}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <View style={styles.categoryRight}>
+                                            <Text style={styles.categoryPercentage}>{category.percentage} %</Text>
+                                            <View style={styles.categoryProgressContainer}>
+                                                <Progress.Bar
+                                                    progress={category.percentage / 100}
+                                                    width={120}
+                                                    height={4}
+                                                    color={category.color}
+                                                    unfilledColor={isDark ? "#374151" : "#F3F4F6"}
+                                                    borderWidth={0}
+                                                    borderRadius={2}
+                                                />
+                                            </View>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -351,7 +332,6 @@ const getThemedStyles = (isDark) =>
         },
         progressLine: {
             height: "100%",
-            width: "70%",
             backgroundColor: "#FFFFFF",
             borderRadius: 2,
         },
@@ -433,31 +413,6 @@ const getThemedStyles = (isDark) =>
         },
         categoryProgressContainer: {
             width: 120,
-        },
-        insightsSection: {
-            marginBottom: 32,
-        },
-        insightsList: {
-            gap: 12,
-        },
-        insightItem: {
-            flexDirection: "row",
-            alignItems: "center",
-            borderRadius: 12,
-            padding: 16,
-        },
-        insightIcon: {
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            justifyContent: "center",
-            alignItems: "center",
-            marginRight: 12,
-        },
-        insightText: {
-            fontSize: 14,
-            fontWeight: "500",
-            flex: 1,
         },
     });
 

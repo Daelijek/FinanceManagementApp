@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ import * as Progress from "react-native-progress";
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
+import { useFocusEffect } from '@react-navigation/native';
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -29,83 +31,141 @@ const BudgetScreen = ({ navigation }) => {
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
 
-  const [selectedMonth, setSelectedMonth] = useState("September 2023");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [budgetData, setBudgetData] = useState({
-    totalBudget: 4500,
-    spent: 2850,
-    remaining: 1650,
-    percentage: 63,
+    totalBudget: 0,
+    spent: 0,
+    remaining: 0,
+    percentage: 0,
   });
 
-  const [categories, setCategories] = useState([
-    {
-      id: 1,
-      name: "Housing",
-      icon: "home",
-      color: "#EF4444",
-      spent: 1200,
-      budget: 1500,
-      iconBg: "#FEE2E2"
-    },
-    {
-      id: 2,
-      name: "Food & Dining",
-      icon: "restaurant",
-      color: "#10B981",
-      spent: 650,
-      budget: 800,
-      iconBg: "#D1FAE5"
-    },
-    {
-      id: 3,
-      name: "Transportation",
-      icon: "car",
-      color: "#F59E0B",
-      spent: 400,
-      budget: 500,
-      iconBg: "#FEF3C7"
-    },
-    {
-      id: 4,
-      name: "Shopping",
-      icon: "bag",
-      color: "#8B5CF6",
-      spent: 300,
-      budget: 400,
-      iconBg: "#F3E8FF"
-    },
-    {
-      id: 5,
-      name: "Entertainment",
-      icon: "game-controller",
-      color: "#06B6D4",
-      spent: 200,
-      budget: 300,
-      iconBg: "#CFFAFE"
-    },
-    {
-      id: 6,
-      name: "Others",
-      icon: "ellipsis-horizontal",
-      color: "#6B7280",
-      spent: 100,
-      budget: 1000,
-      iconBg: "#F3F4F6"
+  const [categories, setCategories] = useState([]);
+  const [insights, setInsights] = useState([]);
+
+  // Получение текущего месяца и года
+  const getCurrentMonthYear = () => {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1, // JavaScript месяцы начинаются с 0
+    };
+  };
+
+  const fetchBudgetData = async () => {
+    try {
+      const { year, month } = getCurrentMonthYear();
+      
+      // Получаем данные о бюджете за текущий месяц
+      const response = await apiFetch(`/api/v1/budgets/current-month`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обновляем общие данные о бюджете
+      setBudgetData({
+        totalBudget: data.total_budget || 0,
+        spent: data.spent || 0,
+        remaining: data.remaining || 0,
+        percentage: data.usage_percentage || 0,
+      });
+
+      // Обновляем категории бюджета
+      const formattedCategories = (data.budgets_by_category || []).map(budget => ({
+        id: budget.id,
+        name: budget.category_name || 'Unknown',
+        icon: budget.category_icon || 'help-outline',
+        color: budget.category_color || '#6B7280',
+        spent: budget.spent_amount || 0,
+        budget: budget.amount || 0,
+        percentage: budget.usage_percentage || 0,
+        iconBg: getIconBackgroundColor(budget.category_color),
+        remaining: budget.remaining_amount || 0,
+      }));
+
+      setCategories(formattedCategories);
+
+      // Генерируем инсайты на основе данных
+      generateInsights(data);
+
+    } catch (error) {
+      console.error('Error fetching budget data:', error);
+      // В случае ошибки устанавливаем пустые данные
+      setBudgetData({
+        totalBudget: 0,
+        spent: 0,
+        remaining: 0,
+        percentage: 0,
+      });
+      setCategories([]);
+      setInsights([]);
     }
-  ]);
+  };
 
-  const [insights] = useState([
-    "You're on track with your budget",
-    "Housing expenses are 15% higher than last month",
-    "Save $200 more in Food category"
-  ]);
+  // Функция для получения цвета фона иконки на основе основного цвета
+  const getIconBackgroundColor = (color) => {
+    const colorMap = {
+      '#EF4444': '#FEE2E2',
+      '#F59E0B': '#FEF3C7',
+      '#10B981': '#D1FAE5',
+      '#3B82F6': '#DBEAFE',
+      '#8B5CF6': '#F3E8FF',
+      '#EC4899': '#FCE7F3',
+      '#06B6D4': '#CFFAFE',
+      '#6B7280': '#F3F4F6',
+    };
+    return colorMap[color] || '#F3F4F6';
+  };
 
-  const months = [
-    "January 2023", "February 2023", "March 2023", "April 2023",
-    "May 2023", "June 2023", "July 2023", "August 2023",
-    "September 2023", "October 2023", "November 2023", "December 2023"
-  ];
+  // Генерация инсайтов на основе данных бюджета
+  const generateInsights = (data) => {
+    const newInsights = [];
+    
+    if (data.usage_percentage <= 80) {
+      newInsights.push("You're on track with your budget");
+    }
+    
+    if (data.usage_percentage > 90) {
+      newInsights.push("Warning: You're close to your budget limit");
+    }
+
+    if (data.summary?.over_budget_count > 0) {
+      newInsights.push(`${data.summary.over_budget_count} categories are over budget`);
+    }
+
+    // Если нет специальных инсайтов, добавляем общие
+    if (newInsights.length === 0) {
+      newInsights.push("Keep tracking your expenses to stay on budget");
+    }
+
+    setInsights(newInsights);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchBudgetData();
+    setRefreshing(false);
+  };
+
+  // Загружаем данные при фокусе на экране
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchBudgetData();
+    }, [])
+  );
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await fetchBudgetData();
+      setLoading(false);
+    };
+    
+    loadData();
+  }, []);
 
   const onSetBudget = () => {
     navigation.navigate("Set Budget");
@@ -119,25 +179,35 @@ const BudgetScreen = ({ navigation }) => {
     navigation.navigate("All Budgets");
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={isDark ? "#FFFFFF" : "#000000"}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{t('budget.title')}</Text>
           <TouchableOpacity>
             <Ionicons name="menu-outline" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Month Selector */}
-        <View style={styles.monthSelector}>
-          <TouchableOpacity style={styles.monthButton}>
-            <Text style={styles.monthText}>{selectedMonth}</Text>
-            <Ionicons name="chevron-down" size={16} color={isDark ? "#D1D5DB" : "#6B7280"} />
           </TouchableOpacity>
         </View>
 
@@ -195,46 +265,57 @@ const BudgetScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.categoriesList}>
-            {categories.map((category) => {
-              const progress = category.spent / category.budget;
-              const isOverBudget = category.spent > category.budget;
-              const Icon = IconCmp(category.icon);
+          {categories.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="wallet-outline" size={48} color={isDark ? "#6B7280" : "#9CA3AF"} />
+              <Text style={styles.emptyStateText}>No budgets set yet</Text>
+              <Text style={styles.emptyStateSubtext}>Create your first budget to start tracking expenses</Text>
+              <TouchableOpacity style={styles.createBudgetButton} onPress={onSetBudget}>
+                <Text style={styles.createBudgetButtonText}>Create Budget</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.categoriesList}>
+              {categories.slice(0, 6).map((category) => {
+                const progress = category.budget > 0 ? category.spent / category.budget : 0;
+                const isOverBudget = category.spent > category.budget;
+                const Icon = IconCmp(category.icon);
 
-              return (
-                <View key={category.id} style={styles.categoryItem}>
-                  <View style={styles.categoryLeft}>
-                    <View style={[styles.categoryIcon, { backgroundColor: category.iconBg }]}>
-                      <Icon
-                        name={category.icon}
-                        size={24}
-                        color={category.color}
+                return (
+                  <View key={category.id} style={styles.categoryItem}>
+                    <View style={styles.categoryLeft}>
+                      <View style={[styles.categoryIcon, { backgroundColor: category.iconBg }]}>
+                        <Icon
+                          name={category.icon}
+                          size={24}
+                          color={category.color}
+                        />
+                      </View>
+                      <Text style={styles.categoryName}>{category.name}</Text>
+                    </View>
+
+                    <View style={styles.categoryRight}>
+                      <Text style={styles.categoryAmount}>
+                        $ {category.spent} / {category.budget}
+                      </Text>
+                    </View>
+
+                    <View style={styles.categoryProgress}>
+                      <Progress.Bar
+                        progress={Math.min(progress, 1)}
+                        width={screenWidth - 80}
+                        height={6}
+                        color={isOverBudget ? "#EF4444" : category.color}
+                        unfilledColor={isDark ? "#374151" : "#F3F4F6"}
+                        borderWidth={0}
+                        borderRadius={3}
                       />
                     </View>
-                    <Text style={styles.categoryName}>{category.name}</Text>
                   </View>
-
-                  <View style={styles.categoryRight}>
-                    <Text style={styles.categoryAmount}>
-                      $ {category.spent} / {category.budget}
-                    </Text>
-                  </View>
-
-                  <View style={styles.categoryProgress}>
-                    <Progress.Bar
-                      progress={Math.min(progress, 1)}
-                      width={screenWidth - 80}
-                      height={6}
-                      color={isOverBudget ? "#EF4444" : category.color}
-                      unfilledColor={isDark ? "#374151" : "#F3F4F6"}
-                      borderWidth={0}
-                      borderRadius={3}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </View>
 
         {/* Budget Insights */}
@@ -261,6 +342,16 @@ const getThemedStyles = (isDark) =>
       flex: 1,
       backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
     },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: isDark ? "#F9FAFB" : "#111827",
+    },
     scrollContainer: {
       paddingBottom: 32,
     },
@@ -276,19 +367,6 @@ const getThemedStyles = (isDark) =>
       fontSize: 24,
       fontWeight: "600",
       color: isDark ? "#F9FAFB" : "#111827",
-    },
-    monthSelector: {
-      paddingHorizontal: 20,
-      paddingVertical: 8,
-    },
-    monthButton: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    monthText: {
-      fontSize: 16,
-      color: isDark ? "#D1D5DB" : "#6B7280",
-      marginRight: 4,
     },
     budgetCard: {
       marginHorizontal: 20,
@@ -353,16 +431,16 @@ const getThemedStyles = (isDark) =>
     actionButtons: {
       flexDirection: "row",
       justifyContent: "space-around",
-      paddingHorizontal: 40, // Увеличил отступы чтобы кнопки лучше распределились
+      paddingHorizontal: 40,
       marginVertical: 8,
     },
     actionButton: {
       alignItems: "center",
       backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
       paddingVertical: 16,
-      paddingHorizontal: 20, // Увеличил padding для большего размера кнопок
+      paddingHorizontal: 20,
       borderRadius: 12,
-      minWidth: 100, // Увеличил минимальную ширину
+      minWidth: 100,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.1,
@@ -394,6 +472,34 @@ const getThemedStyles = (isDark) =>
       fontSize: 14,
       color: "#2563EB",
       fontWeight: "500",
+    },
+    emptyState: {
+      alignItems: "center",
+      paddingVertical: 40,
+    },
+    emptyStateText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: isDark ? "#F9FAFB" : "#111827",
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptyStateSubtext: {
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+      textAlign: "center",
+      marginBottom: 24,
+    },
+    createBudgetButton: {
+      backgroundColor: "#2563EB",
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    createBudgetButtonText: {
+      color: "#FFFFFF",
+      fontWeight: "600",
+      fontSize: 16,
     },
     categoriesList: {
       gap: 20,
