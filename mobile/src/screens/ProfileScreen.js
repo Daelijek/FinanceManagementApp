@@ -1,4 +1,4 @@
-import React, { useContext, version } from "react";
+import React, { useContext, version, useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -12,8 +12,14 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
 import { useTranslation } from 'react-i18next';
+import { apiFetch } from "../api";
 
 const ProfileScreen = ({ navigation }) => {
+  const [userName, setUserName] = useState("");
+  const [email, setEmail] = useState("");
+  const [subscription, setSubscription] = useState("");  // вот здесь тип подписки
+  const [loading, setLoading] = useState(false);
+
   const { t } = useTranslation();
   const onPrivacyPolicy = () => navigation.navigate("Privacy Policy")
   const onAppSettings = () => navigation.navigate("App Settings")
@@ -25,6 +31,37 @@ const ProfileScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await apiFetch("/api/v1/users/me");
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
+        console.log("Профиль пользователя:", data);
+
+        setUserName(data.full_name || "");
+        setEmail(data.email || "");
+        // Если поле называется иначе — замените data.subscription_type
+        setSubscription(data.subscription_type || data.plan || "");
+      } catch (err) {
+        console.error("Load profile error:", err);
+        Alert.alert(t('common.error'), t('personal_info.load_error'));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [t]);
+
+  const renderSubscription = (sub) => {
+    switch (sub) {
+      case "premium": return t('profile.premium_member');
+      case "free": return t('profile.free_member');
+      case "trial": return t('profile.trial_member');
+      default: return t('profile.no_subscription');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,9 +82,11 @@ const ProfileScreen = ({ navigation }) => {
               source={require("../../assets/walter.png")}
               style={styles.headerImg}
             />
-            <Text style={styles.headerText}>Walter White</Text>
-            <Text style={styles.headerLabel}>walter.white@gmail.com</Text>
-            <Text style={styles.headerRole}>{t('profile.premium_member')}</Text>
+            <Text style={styles.headerText}>{userName || "User"}</Text>
+            <Text style={styles.headerLabel}>{email || "Email"}</Text>
+            <Text style={styles.headerRole}>
+              {renderSubscription(subscription)}
+            </Text>
           </View>
         </LinearGradient>
         <View style={styles.cardsBkg}>

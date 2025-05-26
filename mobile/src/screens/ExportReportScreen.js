@@ -1,5 +1,7 @@
 // src/screens/ExportReportScreen.js - ОБНОВЛЕННАЯ ВЕРСИЯ С ПОЛНОЙ ИНТЕГРАЦИЕЙ БЭКЕНДА
 
+// src/screens/ExportReportScreen.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
 import React, { useContext, useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -53,11 +55,13 @@ const ExportReportScreen = ({ navigation }) => {
   const [recentExports, setRecentExports] = useState([]);
   const [reportData, setReportData] = useState(null);
 
+  // Исправленный список типов отчетов
   const reportTypes = [
-    { key: "weekly_summary", label: "Weekly Financial Summary" },
-    { key: "monthly_summary", label: "Monthly Financial Summary" },
-    { key: "quarterly_summary", label: "Quarterly Financial Report" },
-    { key: "yearly_summary", label: "Yearly Financial Report" },
+    { key: "weekly_summary", label: t('reports.weekly_summary') || "Weekly Financial Summary" },
+    { key: "monthly_summary", label: t('reports.monthly_summary') || "Monthly Financial Summary" },
+    { key: "quarterly_summary", label: t('reports.quarterly') || "Quarterly Financial Report" },
+    { key: "yearly_summary", label: t('reports.yearly') || "Yearly Financial Report" },
+    { key: "custom_period", label: "Custom Date Range" },
     { key: "transaction_details", label: "Transaction History" },
     { key: "budget_analysis", label: "Budget Analysis" },
     { key: "category_breakdown", label: "Category Breakdown" }
@@ -73,10 +77,14 @@ const ExportReportScreen = ({ navigation }) => {
       const response = await apiFetch("/api/v1/reports/exports?limit=10");
       if (response.ok) {
         const data = await response.json();
-        setRecentExports(data);
+        setRecentExports(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Failed to load recent exports:', response.status);
+        setRecentExports([]);
       }
     } catch (error) {
       console.error('Error loading recent exports:', error);
+      setRecentExports([]);
     }
   };
 
@@ -87,32 +95,61 @@ const ExportReportScreen = ({ navigation }) => {
       const endDate = toDate.toISOString().split('T')[0];
 
       let endpoint = "/api/v1/reports/monthly-summary";
-      let params = new URLSearchParams();
+      const params = new URLSearchParams();
 
-      if (reportType === "weekly_summary") {
-        endpoint = "/api/v1/reports/weekly-summary";
-      } else if (reportType === "monthly_summary") {
-        endpoint = "/api/v1/reports/monthly-summary";
-        params.append('year', fromDate.getFullYear().toString());
-        params.append('month', (fromDate.getMonth() + 1).toString());
-      } else if (reportType === "custom_period") {
-        endpoint = "/api/v1/transactions/";
-        params.append('start_date', startDate);
-        params.append('end_date', endDate);
-        params.append('limit', '10000');
+      // Исправленная логика выбора эндпоинта
+      switch (reportType) {
+        case "weekly_summary":
+          endpoint = "/api/v1/reports/weekly-summary";
+          break;
+        case "monthly_summary":
+          endpoint = "/api/v1/reports/monthly-summary";
+          params.append('year', fromDate.getFullYear().toString());
+          params.append('month', (fromDate.getMonth() + 1).toString());
+          break;
+        case "quarterly_summary":
+          endpoint = "/api/v1/reports/monthly-summary";
+          // Для квартального отчета используем текущий квартал
+          const quarter = Math.floor(fromDate.getMonth() / 3) + 1;
+          params.append('year', fromDate.getFullYear().toString());
+          params.append('quarter', quarter.toString());
+          break;
+        case "yearly_summary":
+          endpoint = "/api/v1/reports/monthly-summary";
+          params.append('year', fromDate.getFullYear().toString());
+          break;
+        case "custom_period":
+        case "transaction_details":
+          endpoint = "/api/v1/transactions/";
+          params.append('start_date', startDate);
+          params.append('end_date', endDate);
+          params.append('limit', '10000');
+          break;
+        case "budget_analysis":
+          endpoint = "/api/v1/budgets/current-month";
+          break;
+        case "category_breakdown":
+          endpoint = "/api/v1/transactions/";
+          params.append('start_date', startDate);
+          params.append('end_date', endDate);
+          params.append('limit', '10000');
+          break;
+        default:
+          endpoint = "/api/v1/reports/monthly-summary";
       }
 
       const url = params.toString() ? `${endpoint}?${params}` : endpoint;
       const response = await apiFetch(url);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch report preview');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
       
-      if (reportType === "custom_period") {
-        // Обрабатываем данные транзакций для кастомного периода
+      // Обработка данных в зависимости от типа отчета
+      if (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") {
+        // Обрабатываем данные транзакций
         const transactions = data.transactions || [];
         let totalIncome = 0;
         let totalExpenses = 0;
@@ -120,7 +157,7 @@ const ExportReportScreen = ({ navigation }) => {
 
         transactions.forEach(tx => {
           if (tx.transaction_type === "income") {
-            totalIncome += tx.amount;
+            totalIncome += Math.abs(tx.amount);
           } else if (tx.transaction_type === "expense") {
             totalExpenses += Math.abs(tx.amount);
             
@@ -143,7 +180,35 @@ const ExportReportScreen = ({ navigation }) => {
           netBalance: totalIncome - totalExpenses,
           transactionCount: transactions.length,
           categoryBreakdown,
-          period: `${formatDate(fromDate)} - ${formatDate(toDate)}`
+          period: reportType === "custom_period" ? 
+            `${formatDate(fromDate)} - ${formatDate(toDate)}` : 
+            getPeriodName(reportType),
+          reportType
+        });
+      } else if (reportType === "budget_analysis") {
+        // Обрабатываем данные бюджета
+        setReportData({
+          totalIncome: 0,
+          totalExpenses: data.spent || 0,
+          netBalance: (data.total_budget || 0) - (data.spent || 0),
+          transactionCount: 0,
+          categoryBreakdown: (data.budgets_by_category || []).reduce((acc, cat) => {
+            acc[cat.category_name] = {
+              amount: cat.spent_amount,
+              count: 0,
+              color: cat.category_color,
+              budget: cat.amount,
+              percentage: cat.usage_percentage
+            };
+            return acc;
+          }, {}),
+          period: data.period_name || "Current Month",
+          budgetData: {
+            total: data.total_budget || 0,
+            used: data.spent || 0,
+            percentage: data.usage_percentage || 0
+          },
+          reportType
         });
       } else {
         // Используем данные из готового отчета
@@ -156,25 +221,50 @@ const ExportReportScreen = ({ navigation }) => {
             data.spending_categories.reduce((acc, cat) => {
               acc[cat.category_name] = {
                 amount: cat.amount,
-                count: cat.transaction_count,
+                count: cat.transaction_count || 0,
                 color: cat.category_color
               };
               return acc;
             }, {}) : {},
-          period: data.period_name || `${formatDate(fromDate)} - ${formatDate(toDate)}`,
+          period: data.period_name || getPeriodName(reportType),
           budgetData: data.budget_total ? {
             total: data.budget_total,
             used: data.budget_used,
             percentage: data.budget_percentage
-          } : null
+          } : null,
+          reportType
         });
       }
 
     } catch (error) {
       console.error('Error fetching report data:', error);
-      Alert.alert('Error', 'Failed to load report preview. Please try again.');
+      Alert.alert(t('common.error'), 'Failed to load report preview. Please try again.');
+      
+      // Устанавливаем пустые данные при ошибке
+      setReportData({
+        totalIncome: 0,
+        totalExpenses: 0,
+        netBalance: 0,
+        transactionCount: 0,
+        categoryBreakdown: {},
+        period: getPeriodName(reportType),
+        reportType
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getPeriodName = (type) => {
+    switch (type) {
+      case "weekly_summary": return "This Week";
+      case "monthly_summary": return "This Month";
+      case "quarterly_summary": return "This Quarter";
+      case "yearly_summary": return "This Year";
+      case "transaction_details": return "Transaction History";
+      case "budget_analysis": return "Budget Analysis";
+      case "category_breakdown": return "Category Breakdown";
+      default: return "Custom Period";
     }
   };
 
@@ -204,7 +294,7 @@ const ExportReportScreen = ({ navigation }) => {
 
   const handleExport = async () => {
     if (!reportData) {
-      Alert.alert('Error', 'Report data not available. Please wait for data to load.');
+      Alert.alert(t('common.error'), 'Report data not available. Please wait for data to load.');
       return;
     }
 
@@ -216,11 +306,13 @@ const ExportReportScreen = ({ navigation }) => {
       include_insights: includeInsights
     };
 
+    const currentReportType = reportTypes.find(rt => rt.key === reportType);
+    
     Alert.alert(
       "Export Report",
-      `Export ${reportTypes.find(rt => rt.key === reportType)?.label} (${reportData.period}) as ${selectedFormat.toUpperCase()}?\n\nReport will include:\n• ${reportData.transactionCount} transactions\n• ${Object.keys(reportData.categoryBreakdown).length} categories\n• ${includeCharts ? 'Charts and graphs' : 'No charts'}\n• ${includeTransactions ? 'Transaction details' : 'Summary only'}`,
+      `Export ${currentReportType?.label || reportType} (${reportData.period}) as ${selectedFormat.toUpperCase()}?\n\nReport will include:\n• ${reportData.transactionCount} transactions\n• ${Object.keys(reportData.categoryBreakdown).length} categories\n• ${includeCharts ? 'Charts and graphs' : 'No charts'}\n• ${includeTransactions ? 'Transaction details' : 'Summary only'}`,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t('common.cancel'), style: "cancel" },
         { text: "Export", onPress: () => processExport(exportOptions) }
       ]
     );
@@ -232,8 +324,10 @@ const ExportReportScreen = ({ navigation }) => {
       const exportRequest = {
         report_type: reportType,
         format: selectedFormat,
-        start_date: reportType === "custom_period" ? fromDate.toISOString().split('T')[0] : null,
-        end_date: reportType === "custom_period" ? toDate.toISOString().split('T')[0] : null,
+        start_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ? 
+          fromDate.toISOString().split('T')[0] : null,
+        end_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ? 
+          toDate.toISOString().split('T')[0] : null,
         options: options
       };
 
@@ -243,7 +337,8 @@ const ExportReportScreen = ({ navigation }) => {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to export report");
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to export report");
       }
 
       const result = await response.json();
@@ -253,7 +348,7 @@ const ExportReportScreen = ({ navigation }) => {
           "Export Started", 
           `Your report is being generated. Export ID: ${result.export_id}\n\nYou can check the status or download it once ready.`,
           [
-            { text: "OK", onPress: () => loadRecentExports() }
+            { text: t('common.ok'), onPress: () => loadRecentExports() }
           ]
         );
       } else if (result.download_url) {
@@ -262,7 +357,7 @@ const ExportReportScreen = ({ navigation }) => {
       
     } catch (error) {
       console.error('Export error:', error);
-      Alert.alert("Export Error", "Failed to export report. Please try again.");
+      Alert.alert("Export Error", `Failed to export report: ${error.message}`);
     } finally {
       setExporting(false);
     }
@@ -281,9 +376,9 @@ const ExportReportScreen = ({ navigation }) => {
           "Download Complete",
           "Report downloaded successfully!",
           [
-            { text: "OK" },
+            { text: t('common.ok') },
             { 
-              text: "Share", 
+              text: t('common.share'), 
               onPress: async () => {
                 if (await Sharing.isAvailableAsync()) {
                   await Sharing.shareAsync(downloadResult.uri);
@@ -305,29 +400,35 @@ const ExportReportScreen = ({ navigation }) => {
       
       if (response.ok) {
         const blob = await response.blob();
-        const fileName = `${exportItem.file_name || `report_${exportItem.export_id}.${exportItem.format}`}`;
+        const fileName = exportItem.file_name || `report_${exportItem.export_id}.${exportItem.format}`;
         
         // Создаем временный файл
-        const fileUri = FileSystem.documentDirectory + fileName;
-        await FileSystem.writeAsStringAsync(fileUri, await blob.text(), {
-          encoding: FileSystem.EncodingType.Base64,
-        });
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64Data = reader.result.split(',')[1];
+          const fileUri = FileSystem.documentDirectory + fileName;
+          
+          await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
 
-        Alert.alert(
-          "Download Complete",
-          "Report downloaded successfully!",
-          [
-            { text: "OK" },
-            { 
-              text: "Share", 
-              onPress: async () => {
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(fileUri);
+          Alert.alert(
+            "Download Complete",
+            "Report downloaded successfully!",
+            [
+              { text: t('common.ok') },
+              { 
+                text: t('common.share'), 
+                onPress: async () => {
+                  if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(fileUri);
+                  }
                 }
               }
-            }
-          ]
-        );
+            ]
+          );
+        };
+        reader.readAsDataURL(blob);
       } else {
         Alert.alert("Error", "Failed to download export. File may have expired.");
       }
@@ -406,6 +507,9 @@ const ExportReportScreen = ({ navigation }) => {
     </Modal>
   );
 
+  // Показываем выбор дат для custom_period, transaction_details и category_breakdown
+  const shouldShowDatePicker = ["custom_period", "transaction_details", "category_breakdown"].includes(reportType);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -434,8 +538,8 @@ const ExportReportScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Date Range Selection - только для custom_period */}
-        {reportType === "custom_period" && (
+        {/* Date Range Selection */}
+        {shouldShowDatePicker && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Select Date Range</Text>
             <View style={styles.dateContainer}>
@@ -526,7 +630,7 @@ const ExportReportScreen = ({ navigation }) => {
                   styles.previewValue, 
                   { color: reportData.netBalance >= 0 ? "#10B981" : "#EF4444" }
                 ]}>
-                  {reportData.netBalance >= 0 ? "+" : "-"}${Math.abs(reportData.netBalance).toLocaleString()}
+                  {reportData.netBalance >= 0 ? "+" : ""}${reportData.netBalance.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.previewRow}>
@@ -715,8 +819,8 @@ const ExportReportScreen = ({ navigation }) => {
                           "Delete Export",
                           "Are you sure you want to delete this export?",
                           [
-                            { text: "Cancel", style: "cancel" },
-                            { text: "Delete", style: "destructive", onPress: () => deleteExport(item.export_id) }
+                            { text: t('common.cancel'), style: "cancel" },
+                            { text: t('common.delete'), style: "destructive", onPress: () => deleteExport(item.export_id) }
                           ]
                         );
                       }}
