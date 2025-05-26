@@ -1,4 +1,4 @@
-// src/screens/ExportReportScreen.js
+// src/screens/ExportReportScreen.js - ОБНОВЛЕННАЯ ВЕРСИЯ С ПОЛНОЙ ИНТЕГРАЦИЕЙ БЭКЕНДА
 
 import React, { useContext, useState, useEffect } from "react";
 import {
@@ -13,6 +13,7 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,7 +21,8 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const ExportReportScreen = ({ navigation }) => {
   const { t } = useTranslation();
@@ -29,31 +31,36 @@ const ExportReportScreen = ({ navigation }) => {
   const styles = getThemedStyles(isDark);
 
   // State for report configuration
-  const [reportType, setReportType] = useState("Monthly Financial Summary");
+  const [reportType, setReportType] = useState("monthly_summary");
   const [fromDate, setFromDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [toDate, setToDate] = useState(new Date());
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState("PDF");
+  const [selectedFormat, setSelectedFormat] = useState("pdf");
   const [showReportTypePicker, setShowReportTypePicker] = useState(false);
 
   // Export options
   const [includeCharts, setIncludeCharts] = useState(true);
   const [includeTransactions, setIncludeTransactions] = useState(true);
   const [includeCategories, setIncludeCategories] = useState(true);
+  const [includeBudgetAnalysis, setIncludeBudgetAnalysis] = useState(true);
+  const [includeInsights, setIncludeInsights] = useState(true);
 
   // API data states
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [recentExports, setRecentExports] = useState([]);
   const [reportData, setReportData] = useState(null);
 
   const reportTypes = [
-    "Monthly Financial Summary",
-    "Annual Financial Report", 
-    "Transaction History",
-    "Budget Analysis",
-    "Category Breakdown"
+    { key: "weekly_summary", label: "Weekly Financial Summary" },
+    { key: "monthly_summary", label: "Monthly Financial Summary" },
+    { key: "quarterly_summary", label: "Quarterly Financial Report" },
+    { key: "yearly_summary", label: "Yearly Financial Report" },
+    { key: "transaction_details", label: "Transaction History" },
+    { key: "budget_analysis", label: "Budget Analysis" },
+    { key: "category_breakdown", label: "Category Breakdown" }
   ];
 
   useEffect(() => {
@@ -63,46 +70,10 @@ const ExportReportScreen = ({ navigation }) => {
 
   const loadRecentExports = async () => {
     try {
-      // Load from AsyncStorage (in real app, this would be from API)
-      const saved = await AsyncStorage.getItem('recentExports');
-      if (saved) {
-        setRecentExports(JSON.parse(saved));
-      } else {
-        // Set default recent exports
-        const defaultExports = [
-          {
-            id: 1,
-            name: "January Financial Report",
-            date: "Feb 1, 2024",
-            format: "PDF",
-            icon: "document-text",
-            color: "#EF4444",
-            reportType: "Monthly Financial Summary",
-            dateRange: "Jan 1, 2024 - Jan 31, 2024"
-          },
-          {
-            id: 2,
-            name: "Q4 Transaction Data",
-            date: "Jan 15, 2024",
-            format: "CSV",
-            icon: "grid",
-            color: "#10B981",
-            reportType: "Transaction History",
-            dateRange: "Oct 1, 2023 - Dec 31, 2023"
-          },
-          {
-            id: 3,
-            name: "December Summary",
-            date: "Jan 5, 2024",
-            format: "PDF",
-            icon: "document-text",
-            color: "#EF4444",
-            reportType: "Budget Analysis",
-            dateRange: "Dec 1, 2023 - Dec 31, 2023"
-          }
-        ];
-        setRecentExports(defaultExports);
-        await AsyncStorage.setItem('recentExports', JSON.stringify(defaultExports));
+      const response = await apiFetch("/api/v1/reports/exports?limit=10");
+      if (response.ok) {
+        const data = await response.json();
+        setRecentExports(data);
       }
     } catch (error) {
       console.error('Error loading recent exports:', error);
@@ -115,67 +86,93 @@ const ExportReportScreen = ({ navigation }) => {
       const startDate = fromDate.toISOString().split('T')[0];
       const endDate = toDate.toISOString().split('T')[0];
 
-      // Fetch transactions for the selected period
-      const response = await apiFetch(`/api/v1/transactions/?start_date=${startDate}&end_date=${endDate}&limit=1000`);
+      let endpoint = "/api/v1/reports/monthly-summary";
+      let params = new URLSearchParams();
+
+      if (reportType === "weekly_summary") {
+        endpoint = "/api/v1/reports/weekly-summary";
+      } else if (reportType === "monthly_summary") {
+        endpoint = "/api/v1/reports/monthly-summary";
+        params.append('year', fromDate.getFullYear().toString());
+        params.append('month', (fromDate.getMonth() + 1).toString());
+      } else if (reportType === "custom_period") {
+        endpoint = "/api/v1/transactions/";
+        params.append('start_date', startDate);
+        params.append('end_date', endDate);
+        params.append('limit', '10000');
+      }
+
+      const url = params.toString() ? `${endpoint}?${params}` : endpoint;
+      const response = await apiFetch(url);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch transactions');
+        throw new Error('Failed to fetch report preview');
       }
 
       const data = await response.json();
-      const transactions = data.transactions || [];
+      
+      if (reportType === "custom_period") {
+        // Обрабатываем данные транзакций для кастомного периода
+        const transactions = data.transactions || [];
+        let totalIncome = 0;
+        let totalExpenses = 0;
+        const categoryBreakdown = {};
 
-      // Calculate report statistics
-      let totalIncome = 0;
-      let totalExpenses = 0;
-      let transactionCount = transactions.length;
-      const categoryBreakdown = {};
-
-      transactions.forEach(tx => {
-        if (tx.transaction_type === "income") {
-          totalIncome += tx.amount;
-        } else if (tx.transaction_type === "expense") {
-          totalExpenses += Math.abs(tx.amount);
-          
-          const categoryName = tx.category_name || "Other";
-          if (!categoryBreakdown[categoryName]) {
-            categoryBreakdown[categoryName] = {
-              amount: 0,
-              count: 0,
-              color: tx.category_color || "#6B7280"
-            };
+        transactions.forEach(tx => {
+          if (tx.transaction_type === "income") {
+            totalIncome += tx.amount;
+          } else if (tx.transaction_type === "expense") {
+            totalExpenses += Math.abs(tx.amount);
+            
+            const categoryName = tx.category_name || "Other";
+            if (!categoryBreakdown[categoryName]) {
+              categoryBreakdown[categoryName] = {
+                amount: 0,
+                count: 0,
+                color: tx.category_color || "#6B7280"
+              };
+            }
+            categoryBreakdown[categoryName].amount += Math.abs(tx.amount);
+            categoryBreakdown[categoryName].count += 1;
           }
-          categoryBreakdown[categoryName].amount += Math.abs(tx.amount);
-          categoryBreakdown[categoryName].count += 1;
-        }
-      });
+        });
 
-      // Get budget data if needed
-      let budgetData = null;
-      if (reportType === "Budget Analysis") {
-        try {
-          const budgetResponse = await apiFetch("/api/v1/budgets/current-month");
-          if (budgetResponse.ok) {
-            budgetData = await budgetResponse.json();
-          }
-        } catch (budgetError) {
-          console.log("Budget data not available");
-        }
+        setReportData({
+          totalIncome,
+          totalExpenses,
+          netBalance: totalIncome - totalExpenses,
+          transactionCount: transactions.length,
+          categoryBreakdown,
+          period: `${formatDate(fromDate)} - ${formatDate(toDate)}`
+        });
+      } else {
+        // Используем данные из готового отчета
+        setReportData({
+          totalIncome: data.income || 0,
+          totalExpenses: data.expenses || 0,
+          netBalance: data.net_balance || 0,
+          transactionCount: data.transaction_count || 0,
+          categoryBreakdown: data.spending_categories ? 
+            data.spending_categories.reduce((acc, cat) => {
+              acc[cat.category_name] = {
+                amount: cat.amount,
+                count: cat.transaction_count,
+                color: cat.category_color
+              };
+              return acc;
+            }, {}) : {},
+          period: data.period_name || `${formatDate(fromDate)} - ${formatDate(toDate)}`,
+          budgetData: data.budget_total ? {
+            total: data.budget_total,
+            used: data.budget_used,
+            percentage: data.budget_percentage
+          } : null
+        });
       }
-
-      setReportData({
-        totalIncome,
-        totalExpenses,
-        netBalance: totalIncome - totalExpenses,
-        transactionCount,
-        categoryBreakdown,
-        budgetData,
-        period: `${formatDate(fromDate)} - ${formatDate(toDate)}`
-      });
 
     } catch (error) {
       console.error('Error fetching report data:', error);
-      Alert.alert('Error', 'Failed to load report data. Please try again.');
+      Alert.alert('Error', 'Failed to load report preview. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -192,14 +189,13 @@ const ExportReportScreen = ({ navigation }) => {
   const getFileSize = (format) => {
     if (!reportData) return "~0 MB";
     
-    // Estimate file size based on data
-    const baseSize = reportData.transactionCount * 0.001; // KB per transaction
-    const chartSize = includeCharts ? 0.5 : 0; // MB for charts
+    const baseSize = reportData.transactionCount * 0.001;
+    const chartSize = includeCharts ? 0.5 : 0;
     const categoriesSize = includeCategories ? Object.keys(reportData.categoryBreakdown).length * 0.01 : 0;
     
     const totalSize = baseSize + chartSize + categoriesSize;
     
-    if (format === "PDF") {
+    if (format === "pdf") {
       return `~${Math.max(1.5, totalSize * 1.5).toFixed(1)} MB`;
     } else {
       return `~${Math.max(0.5, totalSize * 0.5).toFixed(1)} MB`;
@@ -212,50 +208,157 @@ const ExportReportScreen = ({ navigation }) => {
       return;
     }
 
+    const exportOptions = {
+      include_charts: includeCharts,
+      include_transaction_details: includeTransactions,
+      include_categories_summary: includeCategories,
+      include_budget_analysis: includeBudgetAnalysis,
+      include_insights: includeInsights
+    };
+
     Alert.alert(
       "Export Report",
-      `Export ${reportType} (${reportData.period}) as ${selectedFormat}?\n\nReport will include:\n${reportData.transactionCount} transactions\n${Object.keys(reportData.categoryBreakdown).length} categories\n${includeCharts ? 'Charts and graphs' : 'No charts'}\n${includeTransactions ? 'Transaction details' : 'Summary only'}`,
+      `Export ${reportTypes.find(rt => rt.key === reportType)?.label} (${reportData.period}) as ${selectedFormat.toUpperCase()}?\n\nReport will include:\n• ${reportData.transactionCount} transactions\n• ${Object.keys(reportData.categoryBreakdown).length} categories\n• ${includeCharts ? 'Charts and graphs' : 'No charts'}\n• ${includeTransactions ? 'Transaction details' : 'Summary only'}`,
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Export", onPress: () => processExport() }
+        { text: "Export", onPress: () => processExport(exportOptions) }
       ]
     );
   };
 
-  const processExport = async () => {
+  const processExport = async (options) => {
     setExporting(true);
     try {
-      // Simulate export API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Add to recent exports
-      const newExport = {
-        id: Date.now(),
-        name: `${reportType} - ${formatDate(fromDate)}`,
-        date: new Date().toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric', 
-          year: 'numeric' 
-        }),
+      const exportRequest = {
+        report_type: reportType,
         format: selectedFormat,
-        icon: selectedFormat === "PDF" ? "document-text" : "grid",
-        color: selectedFormat === "PDF" ? "#EF4444" : "#10B981",
-        reportType,
-        dateRange: reportData.period
+        start_date: reportType === "custom_period" ? fromDate.toISOString().split('T')[0] : null,
+        end_date: reportType === "custom_period" ? toDate.toISOString().split('T')[0] : null,
+        options: options
       };
 
-      const updatedExports = [newExport, ...recentExports.slice(0, 4)];
-      setRecentExports(updatedExports);
-      await AsyncStorage.setItem('recentExports', JSON.stringify(updatedExports));
+      const response = await apiFetch("/api/v1/reports/export", {
+        method: "POST",
+        body: JSON.stringify(exportRequest),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export report");
+      }
+
+      const result = await response.json();
       
-      Alert.alert("Success", "Report exported successfully!");
-      navigation.goBack();
+      if (result.status === "processing") {
+        Alert.alert(
+          "Export Started", 
+          `Your report is being generated. Export ID: ${result.export_id}\n\nYou can check the status or download it once ready.`,
+          [
+            { text: "OK", onPress: () => loadRecentExports() }
+          ]
+        );
+      } else if (result.download_url) {
+        await downloadFile(result.download_url, result.export_id);
+      }
+      
     } catch (error) {
       console.error('Export error:', error);
-      Alert.alert("Error", "Failed to export report. Please try again.");
+      Alert.alert("Export Error", "Failed to export report. Please try again.");
     } finally {
       setExporting(false);
     }
+  };
+
+  const downloadFile = async (url, exportId) => {
+    try {
+      const fileName = `financial_report_${exportId}.${selectedFormat}`;
+      const downloadResult = await FileSystem.downloadAsync(
+        url,
+        FileSystem.documentDirectory + fileName
+      );
+
+      if (downloadResult.status === 200) {
+        Alert.alert(
+          "Download Complete",
+          "Report downloaded successfully!",
+          [
+            { text: "OK" },
+            { 
+              text: "Share", 
+              onPress: async () => {
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(downloadResult.uri);
+                }
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      Alert.alert("Download Error", "Failed to download file.");
+    }
+  };
+
+  const handleDownloadExport = async (exportItem) => {
+    try {
+      const response = await apiFetch(`/api/v1/reports/export/${exportItem.export_id}/download`);
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const fileName = `${exportItem.file_name || `report_${exportItem.export_id}.${exportItem.format}`}`;
+        
+        // Создаем временный файл
+        const fileUri = FileSystem.documentDirectory + fileName;
+        await FileSystem.writeAsStringAsync(fileUri, await blob.text(), {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        Alert.alert(
+          "Download Complete",
+          "Report downloaded successfully!",
+          [
+            { text: "OK" },
+            { 
+              text: "Share", 
+              onPress: async () => {
+                if (await Sharing.isAvailableAsync()) {
+                  await Sharing.shareAsync(fileUri);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert("Error", "Failed to download export. File may have expired.");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      Alert.alert("Download Error", "Failed to download file.");
+    }
+  };
+
+  const deleteExport = async (exportId) => {
+    try {
+      const response = await apiFetch(`/api/v1/reports/exports/${exportId}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        setRecentExports(prev => prev.filter(exp => exp.export_id !== exportId));
+        Alert.alert("Success", "Export deleted successfully.");
+      } else {
+        Alert.alert("Error", "Failed to delete export.");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      Alert.alert("Error", "Failed to delete export.");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadRecentExports(), fetchReportPreview()]);
+    setRefreshing(false);
   };
 
   const ReportTypeModal = () => (
@@ -274,25 +377,25 @@ const ExportReportScreen = ({ navigation }) => {
           <Text style={styles.modalTitle}>Select Report Type</Text>
           <FlatList
             data={reportTypes}
-            keyExtractor={(item) => item}
+            keyExtractor={(item) => item.key}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[
                   styles.modalOption,
-                  item === reportType && styles.modalOptionSelected
+                  item.key === reportType && styles.modalOptionSelected
                 ]}
                 onPress={() => {
-                  setReportType(item);
+                  setReportType(item.key);
                   setShowReportTypePicker(false);
                 }}
               >
                 <Text style={[
                   styles.modalOptionText,
-                  item === reportType && styles.modalOptionTextSelected
+                  item.key === reportType && styles.modalOptionTextSelected
                 ]}>
-                  {item}
+                  {item.label}
                 </Text>
-                {item === reportType && (
+                {item.key === reportType && (
                   <Ionicons name="checkmark" size={20} color="#2563EB" />
                 )}
               </TouchableOpacity>
@@ -305,7 +408,17 @@ const ExportReportScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={isDark ? "#FFFFFF" : "#000000"}
+          />
+        }
+      >
         
         {/* Report Type Selection */}
         <View style={styles.section}>
@@ -314,62 +427,66 @@ const ExportReportScreen = ({ navigation }) => {
             style={styles.dropdown}
             onPress={() => setShowReportTypePicker(true)}
           >
-            <Text style={styles.dropdownText}>{reportType}</Text>
+            <Text style={styles.dropdownText}>
+              {reportTypes.find(rt => rt.key === reportType)?.label || "Monthly Summary"}
+            </Text>
             <Ionicons name="chevron-down" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
           </TouchableOpacity>
         </View>
 
-        {/* Date Range Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Date Range</Text>
-          <View style={styles.dateContainer}>
-            <View style={styles.dateInputContainer}>
-              <Text style={styles.dateLabel}>From</Text>
-              <TouchableOpacity 
-                style={styles.dateInput}
-                onPress={() => setShowFromPicker(true)}
-              >
-                <Text style={styles.dateText}>{formatDate(fromDate)}</Text>
-                <Ionicons name="calendar-outline" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
-              </TouchableOpacity>
+        {/* Date Range Selection - только для custom_period */}
+        {reportType === "custom_period" && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Date Range</Text>
+            <View style={styles.dateContainer}>
+              <View style={styles.dateInputContainer}>
+                <Text style={styles.dateLabel}>From</Text>
+                <TouchableOpacity 
+                  style={styles.dateInput}
+                  onPress={() => setShowFromPicker(true)}
+                >
+                  <Text style={styles.dateText}>{formatDate(fromDate)}</Text>
+                  <Ionicons name="calendar-outline" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.dateInputContainer}>
+                <Text style={styles.dateLabel}>To</Text>
+                <TouchableOpacity 
+                  style={styles.dateInput}
+                  onPress={() => setShowToPicker(true)}
+                >
+                  <Text style={styles.dateText}>{formatDate(toDate)}</Text>
+                  <Ionicons name="calendar-outline" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <View style={styles.dateInputContainer}>
-              <Text style={styles.dateLabel}>To</Text>
-              <TouchableOpacity 
-                style={styles.dateInput}
-                onPress={() => setShowToPicker(true)}
-              >
-                <Text style={styles.dateText}>{formatDate(toDate)}</Text>
-                <Ionicons name="calendar-outline" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
-              </TouchableOpacity>
-            </View>
+            {showFromPicker && (
+              <DateTimePicker
+                value={fromDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowFromPicker(false);
+                  if (selectedDate) setFromDate(selectedDate);
+                }}
+              />
+            )}
+
+            {showToPicker && (
+              <DateTimePicker
+                value={toDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowToPicker(false);
+                  if (selectedDate) setToDate(selectedDate);
+                }}
+              />
+            )}
           </View>
-
-          {showFromPicker && (
-            <DateTimePicker
-              value={fromDate}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowFromPicker(false);
-                if (selectedDate) setFromDate(selectedDate);
-              }}
-            />
-          )}
-
-          {showToPicker && (
-            <DateTimePicker
-              value={toDate}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowToPicker(false);
-                if (selectedDate) setToDate(selectedDate);
-              }}
-            />
-          )}
-        </View>
+        )}
 
         {/* Report Preview */}
         {loading ? (
@@ -416,6 +533,12 @@ const ExportReportScreen = ({ navigation }) => {
                 <Text style={styles.previewLabel}>Categories:</Text>
                 <Text style={styles.previewValue}>{Object.keys(reportData.categoryBreakdown).length}</Text>
               </View>
+              {reportData.budgetData && (
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>Budget Usage:</Text>
+                  <Text style={styles.previewValue}>{reportData.budgetData.percentage.toFixed(0)}%</Text>
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -427,16 +550,16 @@ const ExportReportScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={[
                 styles.formatCard,
-                selectedFormat === "PDF" && styles.formatCardSelected
+                selectedFormat === "pdf" && styles.formatCardSelected
               ]}
-              onPress={() => setSelectedFormat("PDF")}
+              onPress={() => setSelectedFormat("pdf")}
             >
               <View style={[styles.formatIcon, { backgroundColor: "#FEE2E2" }]}>
                 <Ionicons name="document-text" size={24} color="#EF4444" />
               </View>
               <Text style={styles.formatTitle}>PDF</Text>
-              <Text style={styles.formatSize}>{getFileSize("PDF")}</Text>
-              {selectedFormat === "PDF" && (
+              <Text style={styles.formatSize}>{getFileSize("pdf")}</Text>
+              {selectedFormat === "pdf" && (
                 <View style={styles.selectedIndicator}>
                   <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
                 </View>
@@ -446,16 +569,16 @@ const ExportReportScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={[
                 styles.formatCard,
-                selectedFormat === "CSV" && styles.formatCardSelected
+                selectedFormat === "csv" && styles.formatCardSelected
               ]}
-              onPress={() => setSelectedFormat("CSV")}
+              onPress={() => setSelectedFormat("csv")}
             >
               <View style={[styles.formatIcon, { backgroundColor: "#D1FAE5" }]}>
                 <Ionicons name="grid" size={24} color="#10B981" />
               </View>
               <Text style={styles.formatTitle}>CSV</Text>
-              <Text style={styles.formatSize}>{getFileSize("CSV")}</Text>
-              {selectedFormat === "CSV" && (
+              <Text style={styles.formatSize}>{getFileSize("csv")}</Text>
+              {selectedFormat === "csv" && (
                 <View style={styles.selectedIndicator}>
                   <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
                 </View>
@@ -493,6 +616,26 @@ const ExportReportScreen = ({ navigation }) => {
             <Switch
               value={includeCategories}
               onValueChange={setIncludeCategories}
+              trackColor={{ false: isDark ? "#374151" : "#F3F4F6", true: "#2563EB" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.optionItem}>
+            <Text style={styles.optionText}>Include Budget Analysis</Text>
+            <Switch
+              value={includeBudgetAnalysis}
+              onValueChange={setIncludeBudgetAnalysis}
+              trackColor={{ false: isDark ? "#374151" : "#F3F4F6", true: "#2563EB" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.optionItem}>
+            <Text style={styles.optionText}>Include Financial Insights</Text>
+            <Switch
+              value={includeInsights}
+              onValueChange={setIncludeInsights}
               trackColor={{ false: isDark ? "#374151" : "#F3F4F6", true: "#2563EB" }}
               thumbColor="#FFFFFF"
             />
@@ -537,16 +680,49 @@ const ExportReportScreen = ({ navigation }) => {
               </View>
             ) : (
               recentExports.map((item) => (
-                <View key={item.id} style={styles.recentItem}>
-                  <View style={[styles.recentIcon, { backgroundColor: item.color + "20" }]}>
-                    <Ionicons name={item.icon} size={20} color={item.color} />
+                <View key={item.export_id} style={styles.recentItem}>
+                  <View style={[styles.recentIcon, { 
+                    backgroundColor: item.format === "pdf" ? "#FEE2E2" : "#D1FAE5" 
+                  }]}>
+                    <Ionicons 
+                      name={item.format === "pdf" ? "document-text" : "grid"} 
+                      size={20} 
+                      color={item.format === "pdf" ? "#EF4444" : "#10B981"} 
+                    />
                   </View>
                   <View style={styles.recentInfo}>
-                    <Text style={styles.recentName}>{item.name}</Text>
-                    <Text style={styles.recentDate}>{item.date}</Text>
+                    <Text style={styles.recentName}>{item.file_name || `${item.report_type}_${item.created_at}`}</Text>
+                    <Text style={styles.recentDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                    <Text style={styles.recentStatus}>
+                      Status: {item.status === "completed" ? "✅ Ready" : 
+                               item.status === "processing" ? "⏳ Processing" : 
+                               item.status === "failed" ? "❌ Failed" : "📋 " + item.status}
+                    </Text>
                   </View>
-                  <View style={styles.recentCheck}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                  <View style={styles.recentActions}>
+                    {item.status === "completed" && (
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => handleDownloadExport(item)}
+                      >
+                        <Ionicons name="download-outline" size={16} color="#2563EB" />
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => {
+                        Alert.alert(
+                          "Delete Export",
+                          "Are you sure you want to delete this export?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Delete", style: "destructive", onPress: () => deleteExport(item.export_id) }
+                          ]
+                        );
+                      }}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </TouchableOpacity>
                   </View>
                 </View>
               ))
@@ -590,6 +766,11 @@ const getThemedStyles = (isDark) =>
       borderRadius: 12,
       borderWidth: 1,
       borderColor: isDark ? "#374151" : "#E5E7EB",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     dropdownText: {
       fontSize: 16,
@@ -617,6 +798,11 @@ const getThemedStyles = (isDark) =>
       borderRadius: 12,
       borderWidth: 1,
       borderColor: isDark ? "#374151" : "#E5E7EB",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     dateText: {
       fontSize: 16,
@@ -632,6 +818,11 @@ const getThemedStyles = (isDark) =>
       borderRadius: 12,
       borderWidth: 1,
       borderColor: isDark ? "#374151" : "#E5E7EB",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
     previewRow: {
       flexDirection: "row",
@@ -664,6 +855,11 @@ const getThemedStyles = (isDark) =>
       borderWidth: 2,
       borderColor: "transparent",
       position: "relative",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
     formatCardSelected: {
       borderColor: "#2563EB",
@@ -700,6 +896,11 @@ const getThemedStyles = (isDark) =>
       padding: 16,
       borderRadius: 12,
       marginBottom: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
     },
     optionText: {
       fontSize: 16,
@@ -785,9 +986,20 @@ const getThemedStyles = (isDark) =>
     recentDate: {
       fontSize: 14,
       color: isDark ? "#9CA3AF" : "#6B7280",
+      marginBottom: 2,
     },
-    recentCheck: {
-      marginLeft: 12,
+    recentStatus: {
+      fontSize: 12,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    recentActions: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    actionButton: {
+      padding: 8,
+      borderRadius: 6,
+      backgroundColor: isDark ? "#374151" : "#F3F4F6",
     },
     modalOverlay: {
       flex: 1,
