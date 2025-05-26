@@ -1,4 +1,4 @@
-// src/i18n/index.js - Полная конфигурация со всеми переводами
+// src/i18n/index.js
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -21,7 +21,10 @@ const resources = {
                 yesterday: "Yesterday",
                 search: "Search",
                 select: "Select",
-                done: "Done"
+                done: "Done",
+                ok: "OK",
+                share: "Share",
+                not_available: "N/A"
             },
             navigation: {
                 home: "Home",
@@ -70,6 +73,7 @@ const resources = {
                 budget_overview: "Budget Overview",
                 monthly_expenses: "Monthly Expenses",
                 no_data: "No data available",
+                no_budgets: "No budgets set yet",
                 no_comparison: "No data available for comparison",
                 actions: {
                     add: "Add",
@@ -117,7 +121,8 @@ const resources = {
                 transaction_saved: "Transaction saved successfully",
                 transaction_deleted: "Transaction deleted successfully",
                 save_error: "Failed to save transaction",
-                delete_error: "Failed to delete transaction"
+                delete_error: "Failed to delete transaction",
+                category_load_error: "Failed to load categories"
             },
             profile: {
                 title: "Profile",
@@ -250,18 +255,6 @@ const resources = {
             },
             budget: {
                 title: "Budget",
-                welcome: "Welcome to the Budget Screen"
-            },
-            reports: {
-                title: "Reports",
-                welcome: "Welcome to the Reports Screen"
-            },
-            transfer: {
-                title: "Transfer",
-                welcome: "Welcome to the Transfers Screen"
-            },
-            budget: {
-                title: "Budget",
                 welcome: "Welcome to the Budget Screen",
                 total_budget: "Total Budget",
                 spent: "Spent",
@@ -311,7 +304,6 @@ const resources = {
                 create_first_budget: "Create your first budget to start tracking your spending",
                 create_budget: "Create Budget"
             },
-
             create_budget: {
                 title: "Create Budget",
                 budget_amount: "Budget Amount",
@@ -325,6 +317,50 @@ const resources = {
                 all_categories_have_budgets: "All Categories Have Budgets",
                 all_categories_subtitle: "You've created budgets for all available categories"
             },
+            reports: {
+                title: "Financial Reports",
+                weekly_summary: "Weekly Summary",
+                monthly_summary: "Monthly Summary",
+                quarterly: "Quarterly",
+                yearly: "Yearly",
+                this_week: "This Week",
+                this_month: "This Month",
+                this_quarter: "This Quarter",
+                this_year: "This Year",
+                select_period: "Select Period",
+                total_income: "Total Income",
+                total_expenses: "Total Expenses",
+                net_balance: "Net Balance",
+                savings_rate: "Savings Rate",
+                budget_status: "Budget Status",
+                used: "Used",
+                remaining: "Remaining",
+                income_vs_expenses: "Income vs Expenses Trend",
+                income: "Income",
+                expenses: "Expenses",
+                spending_by_categories: "Spending by Categories",
+                transaction_statistics: "Transaction Statistics",
+                total_transactions: "Total Transactions",
+                average_amount: "Average Amount",
+                largest_expense: "Largest Expense",
+                top_category: "Top Category",
+                financial_insights: "Financial Insights",
+                export_report: "Export Report",
+                exporting: "Exporting...",
+                export_started: "Export Started",
+                export_processing: "Your report is being generated. You can download it from the Export Report screen.",
+                export_failed: "Failed to export report. Please try again.",
+                go_to_exports: "Go to Exports",
+                view_all_exports: "View All Exports",
+                download_complete: "Download Complete",
+                download_success: "Report downloaded successfully!",
+                download_failed: "Failed to download file.",
+                failed_to_load: "Failed to load report data. Please try again.",
+                no_data: "No Report Data",
+                no_data_subtitle: "Start adding transactions to see your financial reports",
+                no_data_to_export: "No report data available to export.",
+                choose_export_format: "Choose export format:"
+            }
         }
     },
     ru: {
@@ -345,7 +381,10 @@ const resources = {
                 yesterday: "Вчера",
                 search: "Поиск",
                 select: "Выбрать",
-                done: "Готово"
+                done: "Готово",
+                ok: "ОК",
+                share: "Поделиться",
+                not_available: "Н/Д"
             },
             navigation: {
                 home: "Главная",
@@ -394,6 +433,7 @@ const resources = {
                 budget_overview: "Обзор бюджета",
                 monthly_expenses: "Месячные расходы",
                 no_data: "Нет данных",
+                no_budgets: "Бюджеты пока не установлены",
                 no_comparison: "Нет данных для сравнения",
                 actions: {
                     add: "Добавить",
@@ -441,7 +481,8 @@ const resources = {
                 transaction_saved: "Транзакция успешно сохранена",
                 transaction_deleted: "Транзакция успешно удалена",
                 save_error: "Не удалось сохранить транзакцию",
-                delete_error: "Не удалось удалить транзакцию"
+                delete_error: "Не удалось удалить транзакцию",
+                category_load_error: "Не удалось загрузить категории"
             },
             profile: {
                 title: "Профиль",
@@ -574,18 +615,6 @@ const resources = {
             },
             budget: {
                 title: "Бюджет",
-                welcome: "Добро пожаловать на экран бюджета"
-            },
-            reports: {
-                title: "Отчеты",
-                welcome: "Добро пожаловать на экран отчетов"
-            },
-            transfer: {
-                title: "Переводы",
-                welcome: "Добро пожаловать на экран переводов"
-            },
-            budget: {
-                title: "Бюджет",
                 welcome: "Добро пожаловать на экран бюджета",
                 total_budget: "Общий бюджет",
                 spent: "Потрачено",
@@ -635,7 +664,6 @@ const resources = {
                 create_first_budget: "Создайте свой первый бюджет для отслеживания расходов",
                 create_budget: "Создать бюджет"
             },
-
             create_budget: {
                 title: "Создать бюджет",
                 budget_amount: "Сумма бюджета",
@@ -649,6 +677,50 @@ const resources = {
                 all_categories_have_budgets: "Для всех категорий созданы бюджеты",
                 all_categories_subtitle: "Вы создали бюджеты для всех доступных категорий"
             },
+            reports: {
+                title: "Финансовые отчеты",
+                weekly_summary: "Недельная сводка",
+                monthly_summary: "Месячная сводка",
+                quarterly: "Квартальный",
+                yearly: "Годовой",
+                this_week: "Эта неделя",
+                this_month: "Этот месяц",
+                this_quarter: "Этот квартал",
+                this_year: "Этот год",
+                select_period: "Выберите период",
+                total_income: "Общий доход",
+                total_expenses: "Общие расходы",
+                net_balance: "Чистый баланс",
+                savings_rate: "Коэффициент сбережений",
+                budget_status: "Статус бюджета",
+                used: "Использовано",
+                remaining: "Остается",
+                income_vs_expenses: "Тренд доходы vs расходы",
+                income: "Доходы",
+                expenses: "Расходы",
+                spending_by_categories: "Расходы по категориям",
+                transaction_statistics: "Статистика транзакций",
+                total_transactions: "Всего транзакций",
+                average_amount: "Средняя сумма",
+                largest_expense: "Наибольший расход",
+                top_category: "Топ категория",
+                financial_insights: "Финансовые инсайты",
+                export_report: "Экспорт отчета",
+                exporting: "Экспортируется...",
+                export_started: "Экспорт начат",
+                export_processing: "Ваш отчет генерируется. Скачать его можно в разделе Экспорт отчетов.",
+                export_failed: "Не удалось экспортировать отчет. Повторите попытку.",
+                go_to_exports: "Перейти к экспортам",
+                view_all_exports: "Посмотреть все экспорты",
+                download_complete: "Загрузка завершена",
+                download_success: "Отчет успешно загружен!",
+                download_failed: "Не удалось загрузить файл.",
+                failed_to_load: "Не удалось загрузить данные отчета. Повторите попытку.",
+                no_data: "Нет данных отчета",
+                no_data_subtitle: "Начните добавлять транзакции, чтобы увидеть финансовые отчеты",
+                no_data_to_export: "Нет данных отчета для экспорта.",
+                choose_export_format: "Выберите формат экспорта:"
+            }
         }
     },
     kz: {
@@ -669,7 +741,10 @@ const resources = {
                 yesterday: "Кеше",
                 search: "Іздеу",
                 select: "Таңдау",
-                done: "Дайын"
+                done: "Дайын",
+                ok: "ОК",
+                share: "Бөлісу",
+                not_available: "Ж/А"
             },
             navigation: {
                 home: "Басты бет",
@@ -718,6 +793,7 @@ const resources = {
                 budget_overview: "Бюджет шолуы",
                 monthly_expenses: "Ай сайынғы шығыстар",
                 no_data: "Деректер жоқ",
+                no_budgets: "Бюджеттер әлі орнатылмаған",
                 no_comparison: "Салыстыру үшін деректер жоқ",
                 actions: {
                     add: "Қосу",
@@ -765,7 +841,8 @@ const resources = {
                 transaction_saved: "Транзакция сәтті сақталды",
                 transaction_deleted: "Транзакция сәтті жойылды",
                 save_error: "Транзакцияны сақтау мүмкін болмады",
-                delete_error: "Транзакцияны жою мүмкін болмады"
+                delete_error: "Транзакцияны жою мүмкін болмады",
+                category_load_error: "Санаттарды жүктеу мүмкін болмады"
             },
             profile: {
                 title: "Профиль",
@@ -898,18 +975,6 @@ const resources = {
             },
             budget: {
                 title: "Бюджет",
-                welcome: "Бюджет экранына қош келдіңіз"
-            },
-            reports: {
-                title: "Есептер",
-                welcome: "Есептер экранына қош келдіңіз"
-            },
-            transfer: {
-                title: "Аударымдар",
-                welcome: "Аударымдар экранына қош келдіңіз"
-            },
-            budget: {
-                title: "Бюджет",
                 welcome: "Бюджет экранына қош келдіңіз",
                 total_budget: "Жалпы бюджет",
                 spent: "Жұмсалған",
@@ -959,7 +1024,6 @@ const resources = {
                 create_first_budget: "Шығыстарды бақылау үшін алғашқы бюджетіңізді жасаңыз",
                 create_budget: "Бюджет жасау"
             },
-
             create_budget: {
                 title: "Бюджет жасау",
                 budget_amount: "Бюджет сомасы",
@@ -973,6 +1037,50 @@ const resources = {
                 all_categories_have_budgets: "Барлық санаттар үшін бюджеттер бар",
                 all_categories_subtitle: "Сіз барлық қол жетімді санаттар үшін бюджеттер жасадыңыз"
             },
+            reports: {
+                title: "Қаржылық есептер",
+                weekly_summary: "Апталық қорытынды",
+                monthly_summary: "Ай сайынғы қорытынды",
+                quarterly: "Тоқсандық",
+                yearly: "Жылдық",
+                this_week: "Осы апта",
+                this_month: "Осы ай",
+                this_quarter: "Осы тоқсан",
+                this_year: "Осы жыл",
+                select_period: "Кезеңді таңдаңыз",
+                total_income: "Жалпы кіріс",
+                total_expenses: "Жалпы шығыстар",
+                net_balance: "Таза баланс",
+                savings_rate: "Жинақтау коэффициенті",
+                budget_status: "Бюджет мәртебесі",
+                used: "Пайдаланылған",
+                remaining: "Қалған",
+                income_vs_expenses: "Кірістер мен шығыстар тренді",
+                income: "Кірістер",
+                expenses: "Шығыстар",
+                spending_by_categories: "Санаттар бойынша шығыстар",
+                transaction_statistics: "Транзакция статистикасы",
+                total_transactions: "Барлық транзакциялар",
+                average_amount: "Орташа сома",
+                largest_expense: "Ең үлкен шығыс",
+                top_category: "Топ санат",
+                financial_insights: "Қаржылық талдау",
+                export_report: "Есепті экспорттау",
+                exporting: "Экспорттауда...",
+                export_started: "Экспорт басталды",
+                export_processing: "Есебіңіз дайындалуда. Оны Есепті экспорттау бөлімінен жүктеп алуға болады.",
+                export_failed: "Есепті экспорттау мүмкін болмады. Қайталаңыз.",
+                go_to_exports: "Экспорттарға өту",
+                view_all_exports: "Барлық экспорттарды көру",
+                download_complete: "Жүктеу аяқталды",
+                download_success: "Есеп сәтті жүктелді!",
+                download_failed: "Файлды жүктеу мүмкін болмады.",
+                failed_to_load: "Есеп деректерін жүктеу мүмкін болмады. Қайталаңыз.",
+                no_data: "Есеп деректері жоқ",
+                no_data_subtitle: "Қаржылық есептерді көру үшін транзакциялар қосуды бастаңыз",
+                no_data_to_export: "Экспортқа арналған есеп деректері жоқ.",
+                choose_export_format: "Экспорт форматын таңдаңыз:"
+            }
         }
     }
 };
@@ -983,7 +1091,7 @@ const initI18n = () => {
         .init({
             lng: 'en',
             fallbackLng: 'en',
-            debug: false, // Отключаем логи для продакшена
+            debug: false,
             resources,
             interpolation: {
                 escapeValue: false,
