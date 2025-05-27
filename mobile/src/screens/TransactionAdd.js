@@ -24,7 +24,7 @@ import { apiFetch } from "../api";
 
 const TransactionAdd = ({ navigation }) => {
   const { t } = useTranslation();
-  const [amount, setAmount] = useState("0.00");
+  const [amount, setAmount] = useState("");
   const [selectedType, setSelectedType] = useState("expense");
   const [categories, setCategories] = useState({ expense: [], income: [] });
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -204,6 +204,7 @@ const TransactionAdd = ({ navigation }) => {
               placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
               keyboardType="numeric"
               value={amount}
+              returnKeyType="done"
               onChangeText={(t) => {
                 const cleaned = t.replace(/[^0-9.]/g, "");
                 setAmount(cleaned.split(".").length <= 2 ? cleaned : amount);

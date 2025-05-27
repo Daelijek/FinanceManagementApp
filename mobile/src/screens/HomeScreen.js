@@ -1,6 +1,6 @@
-// src/screens/HomeScreen.js - ПОЛНАЯ ВЕРСИЯ С ПЕРЕВОДАМИ
+// src/screens/HomeScreen.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
-import React, { useContext, useState, useEffect, useCallback } from "react";
+import React, { useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   StyleSheet,
@@ -12,6 +12,8 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Animated,
+  StatusBar,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,12 +36,626 @@ const getMonthDateRange = (year, month) => {
   return { firstDay, lastDay };
 };
 
+// Функция для получения тематических стилей (вынесена наружу)
+const getThemedStyles = (isDark) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+    },
+    scrollContainer: {
+      paddingBottom: 32,
+    },
+    containerInner: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 32,
+      paddingHorizontal: 4,
+    },
+    headerGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    profileImageContainer: {
+      position: "relative",
+      marginRight: 16,
+    },
+    headerImg: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 3,
+      borderColor: isDark ? "#374151" : "#FFFFFF",
+    },
+    onlineIndicator: {
+      position: "absolute",
+      bottom: 2,
+      right: 2,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: "#22C55E",
+      borderWidth: 2,
+      borderColor: isDark ? "#0F172A" : "#F8FAFC",
+    },
+    greetingText: {
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+      marginBottom: 2,
+    },
+    headerText: {
+      fontWeight: "600",
+      fontSize: 20,
+      color: isDark ? "#F9FAFB" : "#111827",
+    },
+    notificationButton: {
+      position: "relative",
+    },
+    notificationGradient: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    notificationBadge: {
+      position: "absolute",
+      top: -2,
+      right: -2,
+      backgroundColor: "#EF4444",
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    notificationBadgeText: {
+      color: "#FFFFFF",
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    totalBalance: {
+      marginBottom: 32,
+    },
+    balanceCardGradient: {
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 12,
+    },
+    balanceCard: {
+      padding: 28,
+      position: "relative",
+      overflow: "hidden",
+    },
+    balanceHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    balanceTitle: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: "#FFFFFF",
+      opacity: 0.9,
+    },
+    balanceIconContainer: {
+      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      borderRadius: 12,
+      padding: 8,
+    },
+    balanceLoadingContainer: {
+      paddingVertical: 20,
+      alignItems: "center",
+    },
+    balanceAmountContainer: {
+      marginBottom: 20,
+    },
+    balanceAmount: {
+      fontWeight: "700",
+      fontSize: 36,
+      color: "#FFFFFF",
+      marginBottom: 8,
+    },
+    balanceChangeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    reportbkg: {
+      backgroundColor: "rgba(255, 255, 255, 0.15)",
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    balanceReport: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: "#FFFFFF",
+    },
+    balanceReportText: {
+      color: "#FFFFFF",
+      fontWeight: "500",
+      fontSize: 14,
+      opacity: 0.8,
+      marginLeft: 8,
+    },
+    decorativeCircle1: {
+      position: "absolute",
+      top: -50,
+      right: -50,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
+    },
+    decorativeCircle2: {
+      position: "absolute",
+      bottom: -30,
+      left: -30,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+    },
+    actions: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 32,
+      paddingHorizontal: 8,
+    },
+    actionCard: {
+      width: (screenWidth - 64) / 4,
+      height: 80,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    actionIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    actionText: {
+      fontSize: 12,
+      fontWeight: "500",
+      textAlign: "center",
+    },
+    recentTransactions: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    recentHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    recentTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: isDark ? "#FFFFFF" : "#111827",
+    },
+    seeAllButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+      gap: 4,
+    },
+    recentAll: {
+      color: "#FFFFFF",
+      fontSize: 14,
+      fontWeight: "500",
+    },
+    recentGroup: {
+      // Added this missing style
+    },
+    skeletonTransaction: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    expenseCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+      paddingVertical: 4,
+    },
+    recentCardGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    expenseIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 16,
+    },
+    expenseTitle: {
+      flex: 1,
+    },
+    expenseText: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#111827",
+      marginBottom: 2,
+    },
+    expenseDate: {
+      fontWeight: "400",
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    expenseInfo: {
+      fontWeight: "600",
+      fontSize: 16,
+      color: isDark ? "#FFFFFF" : "#111827",
+    },
+    incomeCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 16,
+      paddingVertical: 4,
+    },
+    incomeIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 16,
+    },
+    incomeText: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: isDark ? "#F3F4F6" : "#111827",
+      marginBottom: 2,
+    },
+    incomeInfo: {
+      fontWeight: "600",
+      fontSize: 16,
+      color: "#16A34A",
+    },
+    budgetOverview: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    budgetHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    budgetOverviewText: {
+      fontWeight: "600",
+      fontSize: 18,
+      color: isDark ? "#F3F4F6" : "#111827",
+    },
+    budgetList: {
+      gap: 20,
+    },
+    skeletonBudget: {
+      paddingVertical: 8,
+    },
+    noBudgetsContainer: {
+      alignItems: "center",
+      paddingVertical: 32,
+    },
+    noBudgetsText: {
+      fontSize: 16,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+      marginTop: 12,
+    },
+    budgetItem: {
+      paddingVertical: 8,
+    },
+    budgetItemHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    budgetCategory: {
+      fontWeight: "500",
+      fontSize: 16,
+      color: isDark ? "#D1D5DB" : "#111827",
+    },
+    budgetAmount: {
+      fontWeight: "500",
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    budgetWarning: {
+      fontSize: 12,
+      color: "#EF4444",
+      marginTop: 4,
+      fontWeight: "500",
+    },
+    monthlyExpenses: {
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 20,
+      padding: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    expensesHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    monthlyExpensesText: {
+      fontWeight: "600",
+      fontSize: 18,
+      color: isDark ? "#F3F4F6" : "#111827",
+    },
+    chartLegend: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    legendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: "#2563EB",
+      marginRight: 6,
+    },
+    legendText: {
+      fontSize: 12,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+    },
+    chartLoadingContainer: {
+      alignItems: "center",
+      paddingVertical: 40,
+    },
+    chartLoadingText: {
+      fontSize: 14,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+      marginTop: 12,
+    },
+    noDataContainer: {
+      alignItems: "center",
+      paddingVertical: 40,
+    },
+    noDataText: {
+      fontSize: 16,
+      color: isDark ? "#9CA3AF" : "#6B7280",
+      marginTop: 12,
+    },
+    chartContainer: {
+      alignItems: "center",
+    },
+  });
+
+// Компонент скелетон лоадера
+const SkeletonLoader = ({ width, height, style }) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [animatedValue]);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: "#E1E5E9",
+          borderRadius: 8,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// Анимированная карточка действия
+const AnimatedActionCard = ({ onPress, icon, text, delay = 0, isDark, styles }) => {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        delay,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        delay,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scaleAnim, slideAnim, delay]);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: scaleAnim }, { translateY: slideAnim }],
+      }}
+    >
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
+        <LinearGradient
+          colors={isDark ? ["#1F2937", "#374151"] : ["#FFFFFF", "#F8FAFC"]}
+          style={[styles.actionCard, { 
+            shadowColor: isDark ? "#000" : "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: isDark ? 0.3 : 0.1,
+            shadowRadius: 8,
+            elevation: 8,
+          }]}
+        >
+          <View style={[styles.actionIconContainer, {
+            backgroundColor: isDark ? "#2563EB" : "#EFF6FF"
+          }]}>
+            <Ionicons name={icon} size={24} color={isDark ? "#FFFFFF" : "#2563EB"} />
+          </View>
+          <Text style={[styles.actionText, { color: isDark ? "#F9FAFB" : "#374151" }]}>
+            {text}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// Анимированная карточка транзакции
+const AnimatedTransactionCard = ({ transaction, isDark, index, styles }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        delay: index * 150,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        delay: index * 150,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim, index]);
+
+  const isExpense = transaction.transaction_type === "expense";
+  const sign = isExpense ? "-" : "+";
+  const date = new Date(transaction.transaction_date).toLocaleDateString();
+  const Icon = IconCmp(transaction.category_icon || "");
+
+  return (
+    <Animated.View
+      style={[
+        isExpense ? styles.expenseCard : styles.incomeCard,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <View style={styles.recentCardGroup}>
+        <LinearGradient
+          colors={isExpense 
+            ? (isDark ? ["#374151", "#4B5563"] : ["#F3F4F6", "#E5E7EB"])
+            : ["#DCFCE7", "#BBF7D0"]
+          }
+          style={isExpense ? styles.expenseIcon : styles.incomeIcon}
+        >
+          <Icon
+            name={transaction.category_icon || "card-outline"}
+            size={20}
+            color={transaction.category_color || "#4B5563"}
+          />
+        </LinearGradient>
+        <View style={styles.expenseTitle}>
+          <Text style={isExpense ? styles.expenseText : styles.incomeText}>
+            {transaction.description}
+          </Text>
+          <Text style={styles.expenseDate}>{date}</Text>
+        </View>
+      </View>
+      <Text style={isExpense ? styles.expenseInfo : styles.incomeInfo}>
+        {sign} {transaction.amount.toFixed(2)}
+      </Text>
+    </Animated.View>
+  );
+};
+
 const HomeScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const { t } = useTranslation();
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
 
+  // Анимации
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const balanceScaleAnim = useRef(new Animated.Value(0)).current;
+  const contentSlideAnim = useRef(new Animated.Value(50)).current;
+  const chartFadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Состояния
   const [userName, setUserName] = useState("");
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [totalBalance, setTotalBalance] = useState(0);
@@ -47,15 +663,43 @@ const HomeScreen = ({ navigation }) => {
   const [balanceChange, setBalanceChange] = useState(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [loadingChart, setLoadingChart] = useState(false);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [monthlyExpensesData, setMonthlyExpensesData] = useState({
     labels: [],
     datasets: [{ data: [] }],
   });
-
   const [budgets, setBudgets] = useState([]);
   const [loadingBudgets, setLoadingBudgets] = useState(false);
 
+  // Запуск входных анимаций
+  const startEntranceAnimations = useCallback(() => {
+    Animated.stagger(200, [
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(balanceScaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentSlideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(chartFadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [headerFadeAnim, balanceScaleAnim, contentSlideAnim, chartFadeAnim]);
+
   const fetchTransactions = useCallback(async () => {
+    setLoadingTransactions(true);
     try {
       const resTx = await apiFetch("/api/v1/transactions/?skip=0&limit=100");
       if (!resTx.ok) throw new Error(`Status ${resTx.status}`);
@@ -69,6 +713,8 @@ const HomeScreen = ({ navigation }) => {
       setRecentTransactions(sorted);
     } catch (err) {
       console.error("Не удалось загрузить транзакции:", err);
+    } finally {
+      setLoadingTransactions(false);
     }
   }, []);
 
@@ -256,7 +902,8 @@ const HomeScreen = ({ navigation }) => {
       fetchTotalBalance();
       fetchExpensesForChart();
       fetchBudgets();
-    }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets])
+      startEntranceAnimations();
+    }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets, startEntranceAnimations])
   );
 
   useEffect(() => {
@@ -265,7 +912,8 @@ const HomeScreen = ({ navigation }) => {
     fetchTotalBalance();
     fetchExpensesForChart();
     fetchBudgets();
-  }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets]);
+    startEntranceAnimations();
+  }, [fetchTransactions, fetchBalancesForComparison, fetchTotalBalance, fetchExpensesForChart, fetchBudgets, startEntranceAnimations]);
 
   const onProfile = () => navigation.navigate("Profile");
   const onTransactionAdd = () => navigation.navigate("Transaction Add");
@@ -293,6 +941,11 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={isDark ? "#0F172A" : "#F8FAFC"}
+      />
+      
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         bounces={false}
@@ -300,28 +953,65 @@ const HomeScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.containerInner}>
-          <View style={styles.header}>
+          
+          {/* Animated Header */}
+          <Animated.View 
+            style={[
+              styles.header,
+              {
+                opacity: headerFadeAnim,
+              }
+            ]}
+          >
             <View style={styles.headerGroup}>
-              <TouchableOpacity onPress={onProfile}>
-                <Image
-                  style={styles.headerImg}
-                  source={require("../../assets/walter.png")}
-                />
+              <TouchableOpacity onPress={onProfile} activeOpacity={0.8}>
+                <View style={styles.profileImageContainer}>
+                  <Image
+                    style={styles.headerImg}
+                    source={require("../../assets/walter.png")}
+                  />
+                  <View style={styles.onlineIndicator} />
+                </View>
               </TouchableOpacity>
-              <Text style={styles.headerText}>
-                {t('home.welcome_back')}, {userName || "User"}
-              </Text>
+              <View>
+                <Text style={styles.greetingText}>
+                  {t('home.welcome_back')} 👋
+                </Text>
+                <Text style={styles.headerText}>
+                  {userName || "User"}
+                </Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={onNotifications}>
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color="#4B5563"
-              />
+            <TouchableOpacity 
+              onPress={onNotifications} 
+              style={styles.notificationButton}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={isDark ? ["#374151", "#4B5563"] : ["#FFFFFF", "#F8FAFC"]}
+                style={styles.notificationGradient}
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={24}
+                  color={isDark ? "#F9FAFB" : "#4B5563"}
+                />
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>3</Text>
+                </View>
+              </LinearGradient>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
-          <View style={styles.totalBalance}>
+          {/* Animated Balance Card */}
+          <Animated.View 
+            style={[
+              styles.totalBalance,
+              {
+                transform: [{ scale: balanceScaleAnim }],
+              }
+            ]}
+          >
             <LinearGradient
               colors={["#2563EB", "#3B82F6"]}
               start={{ x: 0, y: 0 }}
@@ -329,129 +1019,178 @@ const HomeScreen = ({ navigation }) => {
               style={styles.balanceCardGradient}
             >
               <View style={styles.balanceCard}>
-                <Text style={styles.balanceTitle}>{t('home.total_balance')}</Text>
-                {loadingBalance ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.balanceAmount}>${totalBalance.toFixed(2)}</Text>
-                )}
-                <View style={styles.balanceGroup}>
-                  <View style={styles.reportbkg}>
-                    {loadingBalance ? null : renderBalanceChange()}
+                <View style={styles.balanceHeader}>
+                  <Text style={styles.balanceTitle}>{t('home.total_balance')}</Text>
+                  <View style={styles.balanceIconContainer}>
+                    <Ionicons name="wallet" size={20} color="#FFFFFF" />
                   </View>
-                  <Text style={styles.balanceReportText}> {t('home.vs_last_month')}</Text>
                 </View>
+                
+                {loadingBalance ? (
+                  <View style={styles.balanceLoadingContainer}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                ) : (
+                  <View style={styles.balanceAmountContainer}>
+                    <Text style={styles.balanceAmount}>${totalBalance.toFixed(2)}</Text>
+                    <View style={styles.balanceChangeContainer}>
+                      <View style={styles.reportbkg}>
+                        {renderBalanceChange()}
+                      </View>
+                      <Text style={styles.balanceReportText}> {t('home.vs_last_month')}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Decorative elements */}
+                <View style={styles.decorativeCircle1} />
+                <View style={styles.decorativeCircle2} />
               </View>
             </LinearGradient>
-          </View>
+          </Animated.View>
 
-          <View style={styles.actions}>
-            <TouchableOpacity onPress={onTransactionAdd}>
-              <View style={styles.actionCard}>
-                <Ionicons
-                  name="add-circle-outline"
-                  size={24}
-                  color="#2563EB"
-                />
-                <Text style={styles.actionText}>{t('home.actions.add')}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onTransfer}>
-              <View style={styles.actionCard}>
-                <Ionicons name="card-outline" size={24} color="#2563EB" />
-                <Text style={styles.actionText}>{t('home.actions.transfer')}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onBudget}>
-              <View style={styles.actionCard}>
-                <Ionicons
-                  name="pie-chart-outline"
-                  size={24}
-                  color="#2563EB"
-                />
-                <Text style={styles.actionText}>{t('home.actions.budget')}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onReports}>
-              <View style={styles.actionCard}>
-                <Ionicons
-                  name="stats-chart-outline"
-                  size={24}
-                  color="#2563EB"
-                />
-                <Text style={styles.actionText}>{t('home.actions.reports')}</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          {/* Animated Actions */}
+          <Animated.View 
+            style={[
+              styles.actions,
+              {
+                transform: [{ translateY: contentSlideAnim }],
+              }
+            ]}
+          >
+            <AnimatedActionCard
+              onPress={onTransactionAdd}
+              icon="add-circle-outline"
+              text={t('home.actions.add')}
+              delay={0}
+              isDark={isDark}
+              styles={styles}
+            />
+            <AnimatedActionCard
+              onPress={onTransfer}
+              icon="arrow-forward-outline"
+              text={t('home.actions.transfer')}
+              delay={100}
+              isDark={isDark}
+              styles={styles}
+            />
+            <AnimatedActionCard
+              onPress={onBudget}
+              icon="pie-chart-outline"
+              text={t('home.actions.budget')}
+              delay={200}
+              isDark={isDark}
+              styles={styles}
+            />
+            <AnimatedActionCard
+              onPress={onReports}
+              icon="stats-chart-outline"
+              text={t('home.actions.reports')}
+              delay={300}
+              isDark={isDark}
+              styles={styles}
+            />
+          </Animated.View>
 
-          <View style={styles.recentTransactions}>
+          {/* Recent Transactions */}
+          <Animated.View 
+            style={[
+              styles.recentTransactions,
+              {
+                transform: [{ translateY: contentSlideAnim }],
+              }
+            ]}
+          >
             <View style={styles.recentHeader}>
               <Text style={styles.recentTitle}>{t('home.recent_transactions')}</Text>
-              <TouchableOpacity onPress={onAllTransactions}>
-                <Text style={styles.recentAll}>{t('home.see_all')}</Text>
+              <TouchableOpacity onPress={onAllTransactions} activeOpacity={0.7}>
+                <LinearGradient
+                  colors={["#2563EB", "#3B82F6"]}
+                  style={styles.seeAllButton}
+                >
+                  <Text style={styles.recentAll}>{t('home.see_all')}</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                </LinearGradient>
               </TouchableOpacity>
             </View>
+            
             <View style={styles.recentGroup}>
-              {recentTransactions.map((tx) => {
-                const isExpense = tx.transaction_type === "expense";
-                const sign = isExpense ? "-" : "+";
-                const date = new Date(tx.transaction_date).toLocaleDateString();
-                const Icon = IconCmp(tx.category_icon || "");
-                return (
-                  <View
-                    key={tx.id}
-                    style={isExpense ? styles.expenseCard : styles.incomeCard}
-                  >
-                    <View style={styles.recentCardGroup}>
-                      <View
-                        style={
-                          isExpense ? styles.expenseIcon : styles.incomeIcon
-                        }
-                      >
-                        <Icon
-                          name={tx.category_icon || "card-outline"}
-                          size={20}
-                          color={tx.category_color || "#4B5563"}
-                        />
-                      </View>
-                      <View style={styles.expenseTitle}>
-                        <Text
-                          style={
-                            isExpense ? styles.expenseText : styles.incomeText
-                          }
-                        >
-                          {tx.description}
-                        </Text>
-                        <Text style={styles.expenseDate}>{date}</Text>
-                      </View>
+              {loadingTransactions ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <View key={index} style={styles.skeletonTransaction}>
+                    <SkeletonLoader width={40} height={40} style={{ borderRadius: 20 }} />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <SkeletonLoader width="60%" height={16} style={{ marginBottom: 4 }} />
+                      <SkeletonLoader width="40%" height={12} />
                     </View>
-                    <Text
-                      style={isExpense ? styles.expenseInfo : styles.incomeInfo}
-                    >
-                      {sign} {tx.amount.toFixed(2)}
-                    </Text>
+                    <SkeletonLoader width={60} height={16} />
                   </View>
-                );
-              })}
+                ))
+              ) : (
+                recentTransactions.map((tx, index) => (
+                  <AnimatedTransactionCard
+                    key={tx.id}
+                    transaction={tx}
+                    isDark={isDark}
+                    index={index}
+                    styles={styles}
+                  />
+                ))
+              )}
             </View>
-          </View>
+          </Animated.View>
 
-          <View style={styles.budgetOverview}>
+          {/* Budget Overview */}
+          <Animated.View 
+            style={[
+              styles.budgetOverview,
+              {
+                transform: [{ translateY: contentSlideAnim }],
+              }
+            ]}
+          >
             <View style={styles.budgetHeader}>
               <Text style={styles.budgetOverviewText}>{t('home.budget_overview')}</Text>
+              <TouchableOpacity onPress={onBudget}>
+                <Ionicons name="settings-outline" size={20} color={isDark ? "#9CA3AF" : "#6B7280"} />
+              </TouchableOpacity>
             </View>
+            
             <View style={styles.budgetList}>
               {loadingBudgets ? (
-                <ActivityIndicator size="large" color="#2563EB" />
+                Array.from({ length: 2 }).map((_, index) => (
+                  <View key={index} style={styles.skeletonBudget}>
+                    <View style={styles.budgetItemHeader}>
+                      <SkeletonLoader width="40%" height={16} />
+                      <SkeletonLoader width="30%" height={14} />
+                    </View>
+                    <SkeletonLoader width="100%" height={8} style={{ marginTop: 8, borderRadius: 4 }} />
+                  </View>
+                ))
               ) : budgets.length === 0 ? (
-                <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
-                  {t('home.no_budgets')}
-                </Text>
+                <View style={styles.noBudgetsContainer}>
+                  <Ionicons name="pie-chart-outline" size={32} color={isDark ? "#6B7280" : "#9CA3AF"} />
+                  <Text style={styles.noBudgetsText}>{t('home.no_budgets')}</Text>
+                </View>
               ) : (
-                budgets.map((item) => {
+                budgets.map((item, index) => {
                   const progress = item.spent_amount / item.amount;
                   return (
-                    <View key={item.id} style={styles.budgetItem}>
+                    <Animated.View 
+                      key={item.id} 
+                      style={[
+                        styles.budgetItem,
+                        {
+                          opacity: chartFadeAnim,
+                          transform: [{
+                            translateY: chartFadeAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [30, 0],
+                            })
+                          }]
+                        }
+                      ]}
+                    >
                       <View style={styles.budgetItemHeader}>
                         <Text style={styles.budgetCategory}>{item.category_name}</Text>
                         <Text style={styles.budgetAmount}>
@@ -463,280 +1202,83 @@ const HomeScreen = ({ navigation }) => {
                         width={null}
                         height={8}
                         color={item.category_color || "#2563EB"}
-                        unfilledColor="#F3F4F6"
+                        unfilledColor={isDark ? "#374151" : "#F3F4F6"}
                         borderWidth={0}
                         style={{ marginTop: 8 }}
                       />
-                    </View>
+                      {progress > 0.8 && (
+                        <Text style={styles.budgetWarning}>
+                          {progress > 1 ? "⚠️ Over budget!" : "⚠️ Near limit"}
+                        </Text>
+                      )}
+                    </Animated.View>
                   );
                 })
               )}
             </View>
-          </View>
+          </Animated.View>
 
-          <View style={styles.monthlyExpenses}>
+          {/* Monthly Expenses Chart */}
+          <Animated.View 
+            style={[
+              styles.monthlyExpenses,
+              {
+                opacity: chartFadeAnim,
+              }
+            ]}
+          >
             <View style={styles.expensesHeader}>
               <Text style={styles.monthlyExpensesText}>{t('home.monthly_expenses')}</Text>
+              <View style={styles.chartLegend}>
+                <View style={styles.legendDot} />
+                <Text style={styles.legendText}>Expenses</Text>
+              </View>
             </View>
 
             {loadingChart ? (
-              <ActivityIndicator size="large" color="#2563EB" />
+              <View style={styles.chartLoadingContainer}>
+                <ActivityIndicator size="large" color="#2563EB" />
+                <Text style={styles.chartLoadingText}>Loading chart data...</Text>
+              </View>
             ) : monthlyExpensesData.labels.length === 0 ? (
-              <Text style={{ color: isDark ? "#FFF" : "#000", textAlign: "center" }}>
-                {t('home.no_data')}
-              </Text>
+              <View style={styles.noDataContainer}>
+                <Ionicons name="bar-chart-outline" size={48} color={isDark ? "#6B7280" : "#9CA3AF"} />
+                <Text style={styles.noDataText}>{t('home.no_data')}</Text>
+              </View>
             ) : (
-              <BarChart
-                data={monthlyExpensesData}
-                width={screenWidth - 40}
-                height={200}
-                yAxisLabel="$"
-                fromZero
-                showValuesOnTopOfBars
-                chartConfig={{
-                  backgroundColor: isDark ? "#1F2937" : "#fff",
-                  backgroundGradientFrom: isDark ? "#1F2937" : "#fff",
-                  backgroundGradientTo: isDark ? "#111827" : "#fff",
-                  decimalPlaces: 2,
-                  color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                  labelColor: (opacity = 1) =>
-                    isDark
-                      ? `rgba(255, 255, 255, ${opacity})`
-                      : `rgba(0, 0, 0, ${opacity})`,
-                  style: { borderRadius: 16 },
-                  propsForBackgroundLines: {
-                    strokeWidth: 0.5,
-                    stroke: isDark ? "#374151" : "#E5E7EB",
-                  },
-                }}
-                style={{ marginVertical: 8, borderRadius: 16 }}
-              />
+              <View style={styles.chartContainer}>
+                <BarChart
+                  data={monthlyExpensesData}
+                  width={screenWidth - 40}
+                  height={200}
+                  yAxisLabel="$"
+                  fromZero
+                  showValuesOnTopOfBars
+                  chartConfig={{
+                    backgroundColor: isDark ? "#1F2937" : "#fff",
+                    backgroundGradientFrom: isDark ? "#1F2937" : "#fff",
+                    backgroundGradientTo: isDark ? "#111827" : "#fff",
+                    decimalPlaces: 2,
+                    color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
+                    labelColor: (opacity = 1) =>
+                      isDark
+                        ? `rgba(255, 255, 255, ${opacity})`
+                        : `rgba(0, 0, 0, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForBackgroundLines: {
+                      strokeWidth: 0.5,
+                      stroke: isDark ? "#374151" : "#E5E7EB",
+                    },
+                  }}
+                  style={{ marginVertical: 8, borderRadius: 16 }}
+                />
+              </View>
             )}
-          </View>
+          </Animated.View>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const getThemedStyles = (isDark) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
-    },
-    header: {
-      height: 64,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      position: "static",
-      marginBottom: 24,
-    },
-    headerGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    headerImg: {
-      width: 32,
-      height: 32,
-      borderRadius: 100,
-    },
-    headerText: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: isDark ? "#F9FAFB" : "#000",
-      marginLeft: 12,
-    },
-    totalBalance: {
-      paddingHorizontal: 20,
-    },
-    balanceCardGradient: {
-      borderRadius: 16,
-    },
-    balanceCard: {
-      height: 144,
-      width: "100%",
-      margin: "auto",
-      padding: 24,
-      justifyContent: "space-around",
-    },
-    balanceTitle: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: "#FFFFFF",
-    },
-    balanceAmount: {
-      fontWeight: "700",
-      fontSize: 30,
-      color: "#FFFFFF",
-    },
-    balanceGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    balanceReport: {
-      fontSize: 14,
-      fontWeight: "500",
-      color: "#FFFFFF",
-      zIndex: 1,
-    },
-    reportbkg: {
-      backgroundColor: "#FFFFFF33",
-      borderRadius: 100,
-      padding: 4,
-    },
-    balanceReportText: {
-      color: "#FFFFFF",
-      fontWeight: "500",
-      fontSize: 14,
-    },
-    actions: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 20,
-      paddingVertical: 24,
-      justifyContent: "space-around",
-    },
-    actionCard: {
-      width: 75,
-      height: 68,
-      alignItems: "center",
-      justifyContent: "space-around",
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      borderRadius: 12,
-    },
-    actionText: {
-      color: isDark ? "#D1D5DB" : "#4B5563",
-      fontWeight: "500",
-      fontSize: 12,
-    },
-    recentTransactions: {
-      padding: 20,
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      marginBottom: 24,
-    },
-    recentHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 17,
-    },
-    recentTitle: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: isDark ? "#FFFFFF" : "#000",
-    },
-    recentAll: {
-      color: "#2563EB",
-      fontSize: 14,
-      fontWeight: "500",
-    },
-    expenseCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 17,
-    },
-    recentCardGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    expenseIcon: {
-      width: 40,
-      height: 40,
-      backgroundColor: isDark ? "#374151" : "#F3F4F6",
-      borderRadius: 100,
-      padding: 10,
-      marginRight: 12,
-    },
-    expenseText: {
-      fontWeight: "500",
-      fontSize: 16,
-      color: isDark ? "#F3F4F6" : "#000",
-    },
-    expenseDate: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: isDark ? "#9CA3AF" : "#6B7280",
-    },
-    expenseInfo: {
-      fontWeight: "600",
-      fontSize: 16,
-      color: isDark ? "#FFFFFF" : "#000",
-    },
-    incomeCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 15,
-    },
-    incomeIcon: {
-      width: 40,
-      height: 40,
-      backgroundColor: "#DCFCE7",
-      borderRadius: 100,
-      padding: 10,
-      marginRight: 12,
-    },
-    incomeText: {
-      fontWeight: "500",
-      fontSize: 16,
-      color: isDark ? "#F3F4F6" : "#000",
-    },
-    incomeDate: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: isDark ? "#9CA3AF" : "#6B7280",
-    },
-    incomeInfo: {
-      fontWeight: "600",
-      fontSize: 16,
-      color: "#16A34A",
-    },
-    budgetOverview: {
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      padding: 20,
-      marginBottom: 24,
-    },
-    budgetOverviewText: {
-      fontWeight: "600",
-      fontSize: 16,
-      color: isDark ? "#F3F4F6" : "#000",
-    },
-    budgetList: {
-      marginTop: 16,
-      gap: 20,
-    },
-    budgetItemHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-    },
-    budgetCategory: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: isDark ? "#D1D5DB" : "#000",
-    },
-    budgetAmount: {
-      fontWeight: "500",
-      fontSize: 14,
-      color: isDark ? "#D1D5DB" : "#000",
-    },
-    monthlyExpenses: {
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      padding: 20,
-      height: 280,
-      marginBottom: 24,
-    },
-    monthlyExpensesText: {
-      fontWeight: "600",
-      fontSize: 16,
-      marginBottom: 20,
-      color: isDark ? "#F3F4F6" : "#111",
-    },
-    expensesHeader: {
-      marginBottom: 12,
-    },
-  });
 
 export default HomeScreen;

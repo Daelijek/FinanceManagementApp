@@ -1,6 +1,4 @@
-// src/screens/BudgetScreen.js
-
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -11,6 +9,8 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
+  Animated,
+  Easing,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -25,11 +25,345 @@ const screenWidth = Dimensions.get("window").width;
 const IconCmp = (iconName) =>
   iconName && iconName.startsWith("piggy-bank") ? MaterialCommunityIcons : Ionicons;
 
+// Скелетон лоадер с анимацией
+const SkeletonLoader = ({ width, height, style, isDark }) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [animatedValue]);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.8],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: isDark ? "#374151" : "#E1E5E9",
+          borderRadius: 8,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// Анимированная карточка категории
+const AnimatedCategoryCard = ({ category, isDark, index, screenWidth, styles }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const delay = index * 200;
+    
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        delay,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        delay,
+        duration: 800,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        delay: delay + 200,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      const progress = category.budget > 0 ? category.spent / category.budget : 0;
+      Animated.timing(progressAnim, {
+        toValue: Math.min(progress, 1),
+        duration: 1500,
+        delay: delay + 600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }).start();
+    }, 100);
+  }, [index, category.spent, category.budget]);
+
+  const progress = category.budget > 0 ? category.spent / category.budget : 0;
+  const isOverBudget = category.spent > category.budget;
+  const Icon = IconCmp(category.icon);
+
+  return (
+    <Animated.View
+      style={[
+        styles.categoryItem,
+        {
+          backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+          opacity: fadeAnim,
+          transform: [
+            { translateY: slideAnim },
+            { scale: scaleAnim }
+          ],
+        }
+      ]}
+    >
+      <View style={styles.categoryContent}>
+        <View style={styles.categoryLeft}>
+          <Animated.View 
+            style={[
+              styles.categoryIcon, 
+              { 
+                backgroundColor: category.iconBg,
+                transform: [{ scale: scaleAnim }]
+              }
+            ]}
+          >
+            <Icon
+              name={category.icon}
+              size={24}
+              color={category.color}
+            />
+          </Animated.View>
+          <View style={styles.categoryInfo}>
+            <Text style={[styles.categoryName, isDark && styles.categoryNameDark]}>
+              {category.name}
+            </Text>
+            <Text style={[styles.categoryAmount, isDark && styles.categoryAmountDark]}>
+              $ {category.spent} / {category.budget}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.categoryProgress}>
+          <View 
+            style={[
+              styles.progressBackground,
+              {
+                backgroundColor: isDark ? "#374151" : "#F3F4F6",
+                width: screenWidth - 80,
+              }
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.progressFill,
+              {
+                width: progressAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, screenWidth - 80],
+                }),
+                backgroundColor: isOverBudget ? "#EF4444" : category.color,
+              }
+            ]}
+          />
+          
+          {isOverBudget && (
+            <Animated.View 
+              style={[
+                styles.overBudgetBadge,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ scale: scaleAnim }]
+                }
+              ]}
+            >
+              <Ionicons name="warning" size={12} color="#FFFFFF" />
+              <Text style={styles.overBudgetText}>Over</Text>
+            </Animated.View>
+          )}
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Анимированная кнопка действия
+const AnimatedActionButton = ({ onPress, icon, text, isDark, delay, styles }) => {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        delay,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        delay,
+        duration: 800,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        delay: delay + 300,
+        duration: 600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    onPress();
+  };
+
+  const rotateInterpolate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        transform: [
+          { scale: scaleAnim },
+          { translateY: slideAnim }
+        ],
+      }}
+    >
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
+        <LinearGradient
+          colors={isDark ? ["#1F2937", "#374151"] : ["#FFFFFF", "#F8FAFC"]}
+          style={[styles.actionButton, {
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: isDark ? 0.4 : 0.15,
+            shadowRadius: 12,
+            elevation: 8,
+          }]}
+        >
+          <Animated.View 
+            style={[
+              styles.actionButtonIcon,
+              { transform: [{ rotate: rotateInterpolate }] }
+            ]}
+          >
+            <Ionicons name={icon} size={20} color="#2563EB" />
+          </Animated.View>
+          <Text style={[styles.actionButtonText, isDark && styles.actionButtonTextDark]}>
+            {text}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// Анимированный инсайт
+const AnimatedInsight = ({ insight, index, isDark, styles }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(40)).current;
+  const dotScaleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const delay = index * 300;
+    
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        delay,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        delay,
+        duration: 800,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }),
+      Animated.spring(dotScaleAnim, {
+        toValue: 1,
+        delay: delay + 400,
+        tension: 150,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.insightItem,
+        {
+          backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+          opacity: fadeAnim,
+          transform: [{ translateX: slideAnim }],
+        }
+      ]}
+    >
+      <Animated.View 
+        style={[
+          styles.insightDot,
+          { transform: [{ scale: dotScaleAnim }] }
+        ]} 
+      />
+      <Text style={[styles.insightText, isDark && styles.insightTextDark]}>
+        {insight}
+      </Text>
+    </Animated.View>
+  );
+};
+
 const BudgetScreen = ({ navigation }) => {
   const { t } = useTranslation();
   const { theme } = useContext(ThemeContext);
   const isDark = theme === "dark";
   const styles = getThemedStyles(isDark);
+
+  // Множество анимаций для разных секций
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const headerSlideAnim = useRef(new Animated.Value(-50)).current;
+  const budgetCardScaleAnim = useRef(new Animated.Value(0)).current;
+  const budgetCardRotateAnim = useRef(new Animated.Value(0)).current;
+  const actionsSlideAnim = useRef(new Animated.Value(100)).current;
+  const sectionTitleFadeAnim = useRef(new Animated.Value(0)).current;
+  const sectionTitleSlideAnim = useRef(new Animated.Value(-30)).current;
 
   const [loading, setLoading] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
@@ -44,12 +378,82 @@ const BudgetScreen = ({ navigation }) => {
   const [categories, setCategories] = useState([]);
   const [insights, setInsights] = useState([]);
 
-  // Получение текущего месяца и года
+  // Мощная анимация входа
+  const startEntranceAnimations = useCallback(() => {
+    // Сброс всех анимаций
+    headerFadeAnim.setValue(0);
+    headerSlideAnim.setValue(-50);
+    budgetCardScaleAnim.setValue(0);
+    budgetCardRotateAnim.setValue(0);
+    actionsSlideAnim.setValue(100);
+    sectionTitleFadeAnim.setValue(0);
+    sectionTitleSlideAnim.setValue(-30);
+    
+    // Запуск анимаций поэтапно
+    Animated.stagger(150, [
+      // Header анимация
+      Animated.parallel([
+        Animated.timing(headerFadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(headerSlideAnim, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.back(1.2)),
+          useNativeDriver: true,
+        }),
+      ]),
+      
+      // Budget card анимация
+      Animated.parallel([
+        Animated.spring(budgetCardScaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+        Animated.timing(budgetCardRotateAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+      
+      // Actions анимация
+      Animated.timing(actionsSlideAnim, {
+        toValue: 0,
+        duration: 800,
+        easing: Easing.out(Easing.back(1.1)),
+        useNativeDriver: true,
+      }),
+      
+      // Section titles анимация
+      Animated.parallel([
+        Animated.timing(sectionTitleFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sectionTitleSlideAnim, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.back(1.1)),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
+
+  // Остальные функции остаются теми же...
   const getCurrentMonthYear = () => {
     const now = new Date();
     return {
       year: now.getFullYear(),
-      month: now.getMonth() + 1, // JavaScript месяцы начинаются с 0
+      month: now.getMonth() + 1,
     };
   };
 
@@ -90,7 +494,6 @@ const BudgetScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error fetching budget data:', error);
 
-      // Показываем ошибку только если это не первая загрузка
       if (!isFirstLoad) {
         Alert.alert(t('common.error'), 'Failed to load budget data');
       }
@@ -107,7 +510,7 @@ const BudgetScreen = ({ navigation }) => {
       setIsFirstLoad(false);
     }
   };
-  // Функция для получения цвета фона иконки на основе основного цвета
+
   const getIconBackgroundColor = (color) => {
     const colorMap = {
       '#EF4444': '#FEE2E2',
@@ -122,7 +525,6 @@ const BudgetScreen = ({ navigation }) => {
     return colorMap[color] || '#F3F4F6';
   };
 
-  // Генерация инсайтов на основе данных бюджета
   const generateInsights = (data) => {
     const newInsights = [];
 
@@ -138,7 +540,6 @@ const BudgetScreen = ({ navigation }) => {
       newInsights.push(`${data.summary.over_budget_count} categories are over budget`);
     }
 
-    // Если нет специальных инсайтов, добавляем общие
     if (newInsights.length === 0) {
       newInsights.push("Keep tracking your expenses to stay on budget");
     }
@@ -152,11 +553,12 @@ const BudgetScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  // Загружаем данные при фокусе на экране
   useFocusEffect(
     React.useCallback(() => {
-      fetchBudgetData();
-    }, [])
+      fetchBudgetData().then(() => {
+        startEntranceAnimations();
+      });
+    }, [startEntranceAnimations])
   );
 
   useEffect(() => {
@@ -164,10 +566,11 @@ const BudgetScreen = ({ navigation }) => {
       setLoading(true);
       await fetchBudgetData();
       setLoading(false);
+      startEntranceAnimations();
     };
 
     loadData();
-  }, []);
+  }, [startEntranceAnimations]);
 
   const onSetBudget = () => {
     navigation.navigate("Set Budget");
@@ -185,12 +588,39 @@ const BudgetScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text style={styles.loadingText}>{t('common.loading')}</Text>
+          {/* Анимированные скелетоны */}
+          <View style={styles.header}>
+            <SkeletonLoader width={120} height={24} isDark={isDark} />
+            <SkeletonLoader width={24} height={24} isDark={isDark} />
+          </View>
+          
+          <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <SkeletonLoader width="100%" height={180} style={{ borderRadius: 16, marginBottom: 20 }} isDark={isDark} />
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: 30 }}>
+              <SkeletonLoader width={100} height={70} style={{ borderRadius: 12 }} isDark={isDark} />
+              <SkeletonLoader width={100} height={70} style={{ borderRadius: 12 }} isDark={isDark} />
+            </View>
+            
+            {Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={{ marginBottom: 20 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                  <SkeletonLoader width={40} height={40} style={{ borderRadius: 12, marginRight: 12 }} isDark={isDark} />
+                  <SkeletonLoader width={100} height={16} isDark={isDark} />
+                </View>
+                <SkeletonLoader width="100%" height={6} style={{ borderRadius: 3 }} isDark={isDark} />
+              </View>
+            ))}
+          </View>
         </View>
       </SafeAreaView>
     );
   }
+
+  const budgetCardRotate = budgetCardRotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '0deg'],
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -205,21 +635,50 @@ const BudgetScreen = ({ navigation }) => {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Анимированный Header */}
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              opacity: headerFadeAnim,
+              transform: [{ translateY: headerSlideAnim }],
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 3,
+            }
+          ]}
+        >
           <Text style={styles.headerTitle}>{t('budget.title')}</Text>
-          <TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7}>
             <Ionicons name="menu-outline" size={24} color={isDark ? "#F9FAFB" : "#111827"} />
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        {/* Budget Card */}
-        <View style={styles.budgetCard}>
+        {/* Анимированная Budget Card */}
+        <Animated.View 
+          style={[
+            styles.budgetCard,
+            {
+              transform: [
+                { scale: budgetCardScaleAnim },
+                { rotate: budgetCardRotate }
+              ],
+            }
+          ]}
+        >
           <LinearGradient
             colors={["#2563EB", "#3B82F6"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.budgetGradient}
+            style={[styles.budgetGradient, {
+              shadowColor: "#667EEA",
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.3,
+              shadowRadius: 20,
+              elevation: 15,
+            }]}
           >
             <View style={styles.budgetContent}>
               <View style={styles.budgetHeader}>
@@ -241,95 +700,123 @@ const BudgetScreen = ({ navigation }) => {
                   <Text style={styles.budgetDetailAmount}>${budgetData.remaining.toLocaleString()}</Text>
                 </View>
               </View>
+
+              <View style={styles.decorativeCircle1} />
+              <View style={styles.decorativeCircle2} />
             </View>
           </LinearGradient>
-        </View>
+        </Animated.View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={onSetBudget}>
-            <Ionicons name="wallet" size={20} color="#2563EB" />
-            <Text style={styles.actionButtonText}>{t('budget.set_budget')}</Text>
-          </TouchableOpacity>
+        {/* Анимированные Action Buttons */}
+        <Animated.View 
+          style={[
+            styles.actionButtons,
+            { transform: [{ translateY: actionsSlideAnim }] }
+          ]}
+        >
+          <AnimatedActionButton
+            onPress={onSetBudget}
+            icon="wallet"
+            text={t('budget.set_budget')}
+            isDark={isDark}
+            delay={0}
+            styles={styles}
+          />
+          
+          <AnimatedActionButton
+            onPress={onAnalytics}
+            icon="analytics"
+            text={t('budget.analytics')}
+            isDark={isDark}
+            delay={200}
+            styles={styles}
+          />
+        </Animated.View>
 
-          <TouchableOpacity style={styles.actionButton} onPress={onAnalytics}>
-            <Ionicons name="analytics" size={20} color="#2563EB" />
-            <Text style={styles.actionButtonText}>{t('budget.analytics')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Budget by Category */}
+        {/* Анимированная секция Categories */}
         <View style={styles.categorySection}>
-          <View style={styles.sectionHeader}>
+          <Animated.View 
+            style={[
+              styles.sectionHeader,
+              {
+                opacity: sectionTitleFadeAnim,
+                transform: [{ translateX: sectionTitleSlideAnim }],
+              }
+            ]}
+          >
             <Text style={styles.sectionTitle}>{t('budget.budget_by_category')}</Text>
-            <TouchableOpacity onPress={onSeeAll}>
+            <TouchableOpacity onPress={onSeeAll} activeOpacity={0.7}>
               <Text style={styles.seeAllText}>{t('budget.see_all')}</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {categories.length === 0 ? (
-            <View style={styles.emptyState}>
+            <Animated.View 
+              style={[
+                styles.emptyState,
+                {
+                  opacity: sectionTitleFadeAnim,
+                  transform: [{ scale: sectionTitleFadeAnim }],
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: isDark ? 0.3 : 0.1,
+                  shadowRadius: 12,
+                  elevation: 8,
+                }
+              ]}
+            >
               <Ionicons name="wallet-outline" size={48} color={isDark ? "#6B7280" : "#9CA3AF"} />
               <Text style={styles.emptyStateText}>No budgets set yet</Text>
               <Text style={styles.emptyStateSubtext}>Create your first budget to start tracking expenses</Text>
-              <TouchableOpacity style={styles.createBudgetButton} onPress={onSetBudget}>
-                <Text style={styles.createBudgetButtonText}>Create Budget</Text>
+              <TouchableOpacity 
+                style={styles.createBudgetButton} 
+                onPress={onSetBudget}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#2563EB", "#3B82F6"]}
+                  style={styles.createBudgetButtonGradient}
+                >
+                  <Text style={styles.createBudgetButtonText}>Create Budget</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           ) : (
             <View style={styles.categoriesList}>
-              {categories.slice(0, 6).map((category) => {
-                const progress = category.budget > 0 ? category.spent / category.budget : 0;
-                const isOverBudget = category.spent > category.budget;
-                const Icon = IconCmp(category.icon);
-
-                return (
-                  <View key={category.id} style={styles.categoryItem}>
-                    <View style={styles.categoryLeft}>
-                      <View style={[styles.categoryIcon, { backgroundColor: category.iconBg }]}>
-                        <Icon
-                          name={category.icon}
-                          size={24}
-                          color={category.color}
-                        />
-                      </View>
-                      <Text style={styles.categoryName}>{category.name}</Text>
-                    </View>
-
-                    <View style={styles.categoryRight}>
-                      <Text style={styles.categoryAmount}>
-                        $ {category.spent} / {category.budget}
-                      </Text>
-                    </View>
-
-                    <View style={styles.categoryProgress}>
-                      <Progress.Bar
-                        progress={Math.min(progress, 1)}
-                        width={screenWidth - 80}
-                        height={6}
-                        color={isOverBudget ? "#EF4444" : category.color}
-                        unfilledColor={isDark ? "#374151" : "#F3F4F6"}
-                        borderWidth={0}
-                        borderRadius={3}
-                      />
-                    </View>
-                  </View>
-                );
-              })}
+              {categories.slice(0, 6).map((category, index) => (
+                <AnimatedCategoryCard
+                  key={category.id}
+                  category={category}
+                  isDark={isDark}
+                  index={index}
+                  screenWidth={screenWidth}
+                  styles={styles}
+                />
+              ))}
             </View>
           )}
         </View>
 
-        {/* Budget Insights */}
+        {/* Анимированные Insights */}
         <View style={styles.insightsSection}>
-          <Text style={styles.sectionTitle}>{t('budget.insights')}</Text>
+          <Animated.View 
+            style={{
+              opacity: sectionTitleFadeAnim,
+              transform: [{ translateX: sectionTitleSlideAnim }],
+            }}
+          >
+            <Text style={styles.sectionTitle}>{t('budget.insights')}</Text>
+          </Animated.View>
 
           <View style={styles.insightsList}>
             {insights.map((insight, index) => (
-              <View key={index} style={styles.insightItem}>
-                <View style={styles.insightDot} />
-                <Text style={styles.insightText}>{insight}</Text>
-              </View>
+              <AnimatedInsight
+                key={index}
+                insight={insight}
+                index={index}
+                isDark={isDark}
+                styles={styles}
+              />
             ))}
           </View>
         </View>
@@ -346,13 +833,7 @@ const getThemedStyles = (isDark) =>
     },
     loadingContainer: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    loadingText: {
-      marginTop: 16,
-      fontSize: 16,
-      color: isDark ? "#F9FAFB" : "#111827",
+      paddingTop: 20,
     },
     scrollContainer: {
       paddingBottom: 32,
@@ -363,7 +844,8 @@ const getThemedStyles = (isDark) =>
       alignItems: "center",
       paddingHorizontal: 20,
       paddingTop: 16,
-      paddingBottom: 8,
+      paddingBottom: 16,
+      backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
     },
     headerTitle: {
       fontSize: 24,
@@ -373,11 +855,13 @@ const getThemedStyles = (isDark) =>
     budgetCard: {
       marginHorizontal: 20,
       marginVertical: 16,
-      borderRadius: 16,
+      borderRadius: 20,
       overflow: "hidden",
     },
     budgetGradient: {
-      padding: 24,
+      padding: 28,
+      position: "relative",
+      overflow: "hidden",
     },
     budgetContent: {
       flex: 1,
@@ -386,31 +870,31 @@ const getThemedStyles = (isDark) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 12,
+      marginBottom: 16,
     },
     budgetLabel: {
-      fontSize: 14,
+      fontSize: 16,
       color: "#FFFFFF",
       opacity: 0.9,
     },
     percentageCircle: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       backgroundColor: "rgba(255, 255, 255, 0.2)",
       justifyContent: "center",
       alignItems: "center",
     },
     percentageText: {
-      fontSize: 16,
-      fontWeight: "600",
+      fontSize: 18,
+      fontWeight: "700",
       color: "#FFFFFF",
     },
     budgetAmount: {
-      fontSize: 32,
+      fontSize: 36,
       fontWeight: "700",
       color: "#FFFFFF",
-      marginBottom: 20,
+      marginBottom: 24,
     },
     budgetDetails: {
       flexDirection: "row",
@@ -423,37 +907,61 @@ const getThemedStyles = (isDark) =>
       fontSize: 14,
       color: "#FFFFFF",
       opacity: 0.8,
-      marginBottom: 4,
+      marginBottom: 6,
     },
     budgetDetailAmount: {
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: "600",
       color: "#FFFFFF",
+    },
+    decorativeCircle1: {
+      position: "absolute",
+      top: -50,
+      right: -50,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: "rgba(255, 255, 255, 0.1)",
+    },
+    decorativeCircle2: {
+      position: "absolute",
+      bottom: -30,
+      left: -30,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
     },
     actionButtons: {
       flexDirection: "row",
       justifyContent: "space-around",
       paddingHorizontal: 40,
-      marginVertical: 8,
+      marginVertical: 16,
     },
     actionButton: {
       alignItems: "center",
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      paddingVertical: 16,
-      paddingHorizontal: 20,
-      borderRadius: 12,
-      minWidth: 100,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
+      paddingVertical: 20,
+      paddingHorizontal: 24,
+      borderRadius: 16,
+      minWidth: 120,
+    },
+    actionButtonIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: "#EFF6FF",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 8,
     },
     actionButtonText: {
-      fontSize: 12,
-      color: isDark ? "#D1D5DB" : "#4B5563",
-      marginTop: 4,
+      fontSize: 14,
+      color: "#4B5563",
+      fontWeight: "600",
       textAlign: "center",
+    },
+    actionButtonTextDark: {
+      color: "#D1D5DB",
     },
     categorySection: {
       paddingHorizontal: 20,
@@ -463,11 +971,11 @@ const getThemedStyles = (isDark) =>
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginBottom: 16,
+      marginBottom: 20,
     },
     sectionTitle: {
-      fontSize: 18,
-      fontWeight: "600",
+      fontSize: 20,
+      fontWeight: "700",
       color: isDark ? "#F9FAFB" : "#111827",
     },
     seeAllText: {
@@ -477,7 +985,9 @@ const getThemedStyles = (isDark) =>
     },
     emptyState: {
       alignItems: "center",
-      paddingVertical: 40,
+      paddingVertical: 48,
+      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+      borderRadius: 20,
     },
     emptyStateText: {
       fontSize: 18,
@@ -493,10 +1003,12 @@ const getThemedStyles = (isDark) =>
       marginBottom: 24,
     },
     createBudgetButton: {
-      backgroundColor: "#2563EB",
+      borderRadius: 12,
+      overflow: "hidden",
+    },
+    createBudgetButtonGradient: {
       paddingHorizontal: 24,
       paddingVertical: 12,
-      borderRadius: 12,
     },
     createBudgetButtonText: {
       color: "#FFFFFF",
@@ -504,83 +1016,117 @@ const getThemedStyles = (isDark) =>
       fontSize: 16,
     },
     categoriesList: {
-      gap: 20,
+      gap: 16,
     },
     categoryItem: {
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      borderRadius: 12,
-      padding: 16,
+      borderRadius: 16,
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    categoryContent: {
+      padding: 20,
     },
     categoryLeft: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 12,
+      marginBottom: 16,
     },
     categoryIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
+      width: 48,
+      height: 48,
+      borderRadius: 16,
       justifyContent: "center",
       alignItems: "center",
-      marginRight: 12,
+      marginRight: 16,
+    },
+    categoryInfo: {
+      flex: 1,
     },
     categoryName: {
       fontSize: 16,
-      fontWeight: "500",
-      color: isDark ? "#F9FAFB" : "#111827",
-      flex: 1,
+      fontWeight: "600",
+      color: "#111827",
+      marginBottom: 4,
     },
-    categoryRight: {
-      position: "absolute",
-      top: 16,
-      right: 16,
+    categoryNameDark: {
+      color: "#F9FAFB",
     },
     categoryAmount: {
       fontSize: 14,
-      color: isDark ? "#9CA3AF" : "#6B7280",
-      textAlign: "right",
+      color: "#6B7280",
+    },
+    categoryAmountDark: {
+      color: "#9CA3AF",
     },
     categoryProgress: {
-      marginTop: 4,
+      position: "relative",
+    },
+    progressBackground: {
+      height: 8,
+      borderRadius: 4,
+    },
+    progressFill: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      height: 8,
+      borderRadius: 4,
+    },
+    overBudgetBadge: {
+      position: "absolute",
+      top: -12,
+      right: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#EF4444",
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 4,
+    },
+    overBudgetText: {
+      color: "#FFFFFF",
+      fontSize: 10,
+      fontWeight: "600",
     },
     insightsSection: {
       paddingHorizontal: 20,
       marginTop: 32,
     },
     insightsList: {
-      marginTop: 16,
-      gap: 16,
+      marginTop: 20,
+      gap: 12,
     },
     insightItem: {
       flexDirection: "row",
       alignItems: "flex-start",
-      backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
-      padding: 16,
-      borderRadius: 12,
+      padding: 20,
+      borderRadius: 16,
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
     insightDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
       backgroundColor: "#2563EB",
       marginTop: 6,
-      marginRight: 12,
+      marginRight: 16,
     },
     insightText: {
       fontSize: 14,
-      color: isDark ? "#D1D5DB" : "#4B5563",
+      color: "#4B5563",
       flex: 1,
       lineHeight: 20,
+    },
+    insightTextDark: {
+      color: "#D1D5DB",
     },
   });
 

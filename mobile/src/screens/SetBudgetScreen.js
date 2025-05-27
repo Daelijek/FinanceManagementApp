@@ -365,6 +365,7 @@ const CreateBudgetModal = ({ visible, onClose, onSave, existingCategories = [] }
                                 <TextInput
                                     style={modalStyles.amountInput}
                                     value={budgetAmount}
+                                    returnKeyType="done"
                                     onChangeText={setBudgetAmount}
                                     placeholder="0"
                                     placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}

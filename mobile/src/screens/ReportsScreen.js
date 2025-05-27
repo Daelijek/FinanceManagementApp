@@ -1,6 +1,6 @@
 // src/screens/ReportsScreen.js
 
-import React, { useContext, useState, useEffect, useCallback } from "react";
+import React, { useContext, useState, useEffect, useCallback, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -14,6 +14,11 @@ import {
   Alert,
   Modal,
   FlatList,
+  Animated,
+  Easing,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -24,6 +29,13 @@ import { apiFetch } from "../api";
 import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android') {
+  if (UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
+}
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -50,12 +62,201 @@ const ReportsScreen = ({ navigation }) => {
   });
   const [pieChartData, setPieChartData] = useState([]);
 
+  // Animation references
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const summaryCardsAnim = useRef(new Animated.Value(0)).current;
+  const balanceCardAnim = useRef(new Animated.Value(0)).current;
+  const chartAnimRef = useRef(new Animated.Value(0)).current;
+  const statsAnimRef = useRef(new Animated.Value(0)).current;
+  const exportButtonScale = useRef(new Animated.Value(1)).current;
+  const modalAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const budgetProgressAnim = useRef(new Animated.Value(0)).current;
+
+  // Insight cards animation values
+  const insightAnimations = useRef([]).current;
+
   const periods = [
     { key: "weekly", label: t('reports.weekly_summary') || "Weekly Summary" },
     { key: "monthly", label: t('reports.monthly_summary') || "Monthly Summary" },
     { key: "quarterly", label: t('reports.quarterly') || "Quarterly" },
     { key: "yearly", label: t('reports.yearly') || "Yearly" }
   ];
+
+  // Initialize insight animations
+  const initializeInsightAnimations = (count) => {
+    insightAnimations.splice(0);
+    for (let i = 0; i < count; i++) {
+      insightAnimations.push(new Animated.Value(0));
+    }
+  };
+
+  // Start entrance animations
+  const startEntranceAnimations = useCallback(() => {
+    // Reset all animations
+    fadeAnim.setValue(0);
+    slideAnim.setValue(50);
+    headerAnim.setValue(0);
+    summaryCardsAnim.setValue(0);
+    balanceCardAnim.setValue(0);
+    chartAnimRef.setValue(0);
+    statsAnimRef.setValue(0);
+    budgetProgressAnim.setValue(0);
+
+    // Staggered entrance animation
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(headerAnim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.back(1.1)),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    // Summary cards animation with delay
+    setTimeout(() => {
+      Animated.spring(summaryCardsAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    }, 200);
+
+    // Balance card animation with delay
+    setTimeout(() => {
+      Animated.spring(balanceCardAnim, {
+        toValue: 1,
+        tension: 80,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+    }, 400);
+
+    // Chart animation with delay
+    setTimeout(() => {
+      Animated.timing(chartAnimRef, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    }, 600);
+
+    // Stats animation with delay
+    setTimeout(() => {
+      Animated.spring(statsAnimRef, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    }, 800);
+  }, []);
+
+  // Animate insights with stagger
+  const animateInsights = useCallback((insights) => {
+    if (insights && insights.length > 0) {
+      initializeInsightAnimations(insights.length);
+      
+      insights.forEach((_, index) => {
+        setTimeout(() => {
+          Animated.spring(insightAnimations[index], {
+            toValue: 1,
+            tension: 100,
+            friction: 8,
+            useNativeDriver: true,
+          }).start();
+        }, index * 100);
+      });
+    }
+  }, []);
+
+  // Pulse animation for loading states
+  const startPulseAnimation = useCallback(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  // Animate budget progress bar
+  const animateBudgetProgress = useCallback((percentage) => {
+    Animated.timing(budgetProgressAnim, {
+      toValue: Math.min(percentage, 100), // Animate to actual percentage, max 100
+      duration: 1000,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
+  // Button press animations
+  const handleButtonPressIn = useCallback((animValue) => {
+    Animated.spring(animValue, {
+      toValue: 0.95,
+      tension: 300,
+      friction: 4,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const handleButtonPressOut = useCallback((animValue) => {
+    Animated.spring(animValue, {
+      toValue: 1,
+      tension: 300,
+      friction: 4,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Modal animations
+  const showModal = useCallback(() => {
+    setShowPeriodModal(true);
+    Animated.spring(modalAnim, {
+      toValue: 1,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const hideModal = useCallback(() => {
+    Animated.timing(modalAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPeriodModal(false);
+    });
+  }, []);
 
   // Получение данных отчета с бэкенда
   const fetchReportData = useCallback(async () => {
@@ -93,6 +294,14 @@ const ReportsScreen = ({ navigation }) => {
       
       const data = await response.json();
       
+      // Debug: проверяем данные о бюджете  
+      console.log("Budget data from API:", {
+        budget_total: data.budget_total,
+        budget_used: data.budget_used,
+        budget_remaining: data.budget_remaining,
+        budget_percentage: data.budget_percentage
+      });
+      
       // Безопасно устанавливаем данные отчета
       const safeReportData = {
         income: data.income || 0,
@@ -114,6 +323,17 @@ const ReportsScreen = ({ navigation }) => {
       };
 
       setReportData(safeReportData);
+
+      // Start animations after data is set
+      setTimeout(() => {
+        startEntranceAnimations();
+        if (safeReportData.insights && safeReportData.insights.length > 0) {
+          setTimeout(() => animateInsights(safeReportData.insights), 1000);
+        }
+        if (safeReportData.budget_percentage > 0) {
+          setTimeout(() => animateBudgetProgress(safeReportData.budget_percentage), 1200);
+        }
+      }, 100);
 
       // Обновляем данные для Line Chart (доходы vs расходы)
       await updateChartData(safeReportData);
@@ -149,7 +369,7 @@ const ReportsScreen = ({ navigation }) => {
       
       Alert.alert(t('common.error'), t('reports.failed_to_load') || "Failed to load report data. Please try again.");
     }
-  }, [selectedPeriod, isDark, t]);
+  }, [selectedPeriod, isDark, t, startEntranceAnimations, animateInsights, animateBudgetProgress]);
 
   // Получение данных для графика из транзакций
   const updateChartData = useCallback(async (reportData) => {
@@ -252,6 +472,21 @@ const ReportsScreen = ({ navigation }) => {
     
     setPieChartData(pieData);
   }, [isDark]);
+
+  // Вспомогательные функции для бюджета
+  const getBudgetProgressColor = (percentage) => {
+    if (percentage > 100) return "#EF4444"; // Red for over budget
+    if (percentage > 90) return "#EF4444";  // Red for close to limit
+    if (percentage > 70) return "#F59E0B";  // Orange for warning
+    return "#22C55E"; // Green for safe
+  };
+
+  const getBudgetPercentageColor = (percentage) => {
+    if (percentage > 100) return "#EF4444"; // Red for over budget
+    if (percentage > 90) return "#EF4444";  // Red for close to limit  
+    if (percentage > 70) return "#F59E0B";  // Orange for warning
+    return isDark ? "#F9FAFB" : "#111827"; // Default color
+  };
 
   // Вспомогательные функции
   const getPeriodName = (period) => {
@@ -412,9 +647,26 @@ const ReportsScreen = ({ navigation }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     await fetchReportData();
     setRefreshing(false);
   }, [fetchReportData]);
+
+  const handlePeriodChange = useCallback((newPeriod) => {
+    LayoutAnimation.configureNext({
+      duration: 300,
+      create: {
+        type: LayoutAnimation.Types.easeInEaseOut,
+        property: LayoutAnimation.Properties.opacity,
+      },
+      update: {
+        type: LayoutAnimation.Types.spring,
+        springDamping: 0.7,
+      },
+    });
+    setSelectedPeriod(newPeriod);
+    hideModal();
+  }, [hideModal]);
 
   useFocusEffect(
     useCallback(() => {
@@ -431,6 +683,11 @@ const ReportsScreen = ({ navigation }) => {
 
     loadData();
   }, [fetchReportData]);
+
+  // Start pulse animation on component mount
+  useEffect(() => {
+    startPulseAnimation();
+  }, [startPulseAnimation]);
 
   const chartConfig = {
     backgroundColor: isDark ? "#1F2937" : "#ffffff",
@@ -453,43 +710,82 @@ const ReportsScreen = ({ navigation }) => {
     <Modal
       visible={showPeriodModal}
       transparent
-      animationType="fade"
-      onRequestClose={() => setShowPeriodModal(false)}
+      animationType="none"
+      onRequestClose={hideModal}
     >
       <TouchableOpacity 
         style={styles.modalOverlay}
         activeOpacity={1}
-        onPress={() => setShowPeriodModal(false)}
+        onPress={hideModal}
       >
-        <View style={styles.modalContent}>
+        <Animated.View 
+          style={[
+            styles.modalContent,
+            {
+              transform: [
+                {
+                  scale: modalAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                },
+                {
+                  translateY: modalAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [50, 0],
+                  }),
+                },
+              ],
+              opacity: modalAnim,
+            },
+          ]}
+        >
           <Text style={styles.modalTitle}>{t('reports.select_period') || "Select Period"}</Text>
           <FlatList
             data={periods}
             keyExtractor={(item) => item.key}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.modalOption,
-                  item.key === selectedPeriod && styles.modalOptionSelected
-                ]}
-                onPress={() => {
-                  setSelectedPeriod(item.key);
-                  setShowPeriodModal(false);
+            renderItem={({ item, index }) => (
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      translateX: modalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [50, 0],
+                      }),
+                    },
+                  ],
+                  opacity: modalAnim,
                 }}
               >
-                <Text style={[
-                  styles.modalOptionText,
-                  item.key === selectedPeriod && styles.modalOptionTextSelected
-                ]}>
-                  {item.label}
-                </Text>
-                {item.key === selectedPeriod && (
-                  <Ionicons name="checkmark" size={20} color="#2563EB" />
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalOption,
+                    item.key === selectedPeriod && styles.modalOptionSelected
+                  ]}
+                  onPress={() => handlePeriodChange(item.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.modalOptionText,
+                    item.key === selectedPeriod && styles.modalOptionTextSelected
+                  ]}>
+                    {item.label}
+                  </Text>
+                  {item.key === selectedPeriod && (
+                    <Animated.View
+                      style={{
+                        transform: [{ scale: pulseAnim }],
+                      }}
+                    >
+                      <Ionicons name="checkmark" size={20} color="#2563EB" />
+                    </Animated.View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             )}
           />
-        </View>
+        </Animated.View>
       </TouchableOpacity>
     </Modal>
   );
@@ -497,18 +793,20 @@ const ReportsScreen = ({ navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+        <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <ActivityIndicator size="large" color="#2563EB" />
+          </Animated.View>
           <Text style={styles.loadingText}>{t('common.loading')}</Text>
-        </View>
+        </Animated.View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.content}
+      <Animated.ScrollView
+        style={[styles.content, { opacity: fadeAnim }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -519,42 +817,121 @@ const ReportsScreen = ({ navigation }) => {
         }
       >
         {/* Header */}
-        <View style={styles.header}>
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              transform: [
+                { translateY: slideAnim },
+                { scale: headerAnim },
+              ],
+              opacity: headerAnim,
+            },
+          ]}
+        >
           <Text style={styles.headerTitle}>{t('reports.title') || "Financial Reports"}</Text>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => setShowPeriodModal(true)}
-          >
-            <Text style={styles.headerButtonText}>
-              {periods.find(p => p.key === selectedPeriod)?.label || "Monthly"}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color="#2563EB" />
-          </TouchableOpacity>
-        </View>
+          <Animated.View style={{ transform: [{ scale: exportButtonScale }] }}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={showModal}
+              onPressIn={() => handleButtonPressIn(exportButtonScale)}
+              onPressOut={() => handleButtonPressOut(exportButtonScale)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.headerButtonText}>
+                {periods.find(p => p.key === selectedPeriod)?.label || "Monthly"}
+              </Text>
+              <Animated.View
+                style={{
+                  transform: [{
+                    rotate: modalAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '180deg'],
+                    }),
+                  }],
+                }}
+              >
+                <Ionicons name="chevron-down" size={16} color="#2563EB" />
+              </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
+        </Animated.View>
 
         {reportData && (
           <>
             {/* Summary Cards */}
-            <View style={styles.summaryContainer}>
-              <View style={styles.summaryCard}>
+            <Animated.View 
+              style={[
+                styles.summaryContainer,
+                {
+                  transform: [{ scale: summaryCardsAnim }],
+                  opacity: summaryCardsAnim,
+                },
+              ]}
+            >
+              <Animated.View 
+                style={[
+                  styles.summaryCard,
+                  {
+                    transform: [
+                      {
+                        translateX: summaryCardsAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-50, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 <Text style={styles.summaryLabel}>{t('reports.total_income') || "Total Income"}</Text>
                 <Text style={[styles.summaryAmount, { color: "#22C55E" }]}>
                   ${reportData.income?.toLocaleString() || "0"}
                 </Text>
                 <Text style={styles.summaryPeriod}>{reportData.period_name}</Text>
-              </View>
+              </Animated.View>
 
-              <View style={styles.summaryCard}>
+              <Animated.View 
+                style={[
+                  styles.summaryCard,
+                  {
+                    transform: [
+                      {
+                        translateX: summaryCardsAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 <Text style={styles.summaryLabel}>{t('reports.total_expenses') || "Total Expenses"}</Text>
                 <Text style={[styles.summaryAmount, { color: "#EF4444" }]}>
                   ${reportData.expenses?.toLocaleString() || "0"}
                 </Text>
                 <Text style={styles.summaryPeriod}>{reportData.period_name}</Text>
-              </View>
-            </View>
+              </Animated.View>
+            </Animated.View>
 
             {/* Net Balance Card */}
-            <View style={styles.balanceCard}>
+            <Animated.View 
+              style={[
+                styles.balanceCard,
+                {
+                  transform: [
+                    { scale: balanceCardAnim },
+                    {
+                      rotateX: balanceCardAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['90deg', '0deg'],
+                      }),
+                    },
+                  ],
+                  opacity: balanceCardAnim,
+                },
+              ]}
+            >
               <LinearGradient
                 colors={reportData.net_balance >= 0 ? ["#22C55E", "#16A34A"] : ["#EF4444", "#DC2626"]}
                 start={{ x: 0, y: 0 }}
@@ -563,53 +940,134 @@ const ReportsScreen = ({ navigation }) => {
               >
                 <View style={styles.balanceContent}>
                   <Text style={styles.balanceLabel}>{t('reports.net_balance') || "Net Balance"}</Text>
-                  <Text style={styles.balanceAmount}>
+                  <Animated.Text 
+                    style={[
+                      styles.balanceAmount,
+                      { transform: [{ scale: pulseAnim }] }
+                    ]}
+                  >
                     {reportData.net_balance >= 0 ? "+" : ""}${reportData.net_balance?.toLocaleString() || "0"}
-                  </Text>
+                  </Animated.Text>
                   <Text style={styles.balanceSubtext}>
                     {t('reports.savings_rate') || "Savings Rate"}: {reportData.savings_rate?.toFixed(1) || "0"}%
                   </Text>
                 </View>
               </LinearGradient>
-            </View>
+            </Animated.View>
 
             {/* Budget Status */}
-            {reportData.budget_total > 0 && (
-              <View style={styles.budgetCard}>
+            {(reportData.budget_total > 0 || reportData.budget_used > 0) && (
+              <Animated.View 
+                style={[
+                  styles.budgetCard,
+                  {
+                    transform: [{ scale: balanceCardAnim }],
+                    opacity: balanceCardAnim,
+                  },
+                ]}
+              >
                 <View style={styles.budgetHeader}>
                   <Text style={styles.budgetTitle}>{t('reports.budget_status') || "Budget Status"}</Text>
-                  <Text style={styles.budgetPercentage}>
-                    {reportData.budget_percentage?.toFixed(0) || "0"}%
-                  </Text>
+                  <View style={styles.budgetPercentageContainer}>
+                    <Animated.Text 
+                      style={[
+                        styles.budgetPercentage,
+                        { 
+                          transform: [{ scale: pulseAnim }],
+                          color: getBudgetPercentageColor(reportData.budget_percentage || 0)
+                        }
+                      ]}
+                    >
+                      {reportData.budget_percentage?.toFixed(0) || "0"}%
+                    </Animated.Text>
+                    {(reportData.budget_percentage || 0) > 100 && (
+                      <View style={styles.overBudgetIndicator}>
+                        <Ionicons name="warning" size={16} color="#EF4444" />
+                      </View>
+                    )}
+                  </View>
                 </View>
                 <View style={styles.budgetProgressContainer}>
                   <View style={styles.budgetProgressBg}>
-                    <View
+                    <Animated.View
                       style={[
                         styles.budgetProgressFill,
                         { 
-                          width: `${Math.min(reportData.budget_percentage || 0, 100)}%`,
-                          backgroundColor: (reportData.budget_percentage || 0) > 90 ? "#EF4444" : 
-                                         (reportData.budget_percentage || 0) > 70 ? "#F59E0B" : "#22C55E"
+                          width: budgetProgressAnim.interpolate({
+                            inputRange: [0, 100],
+                            outputRange: ['0%', '100%'],
+                            extrapolate: 'clamp',
+                          }),
+                          backgroundColor: getBudgetProgressColor(reportData.budget_percentage || 0)
                         }
                       ]}
                     />
+                    {/* Overflow indicator for over-budget */}
+                    {(reportData.budget_percentage || 0) > 100 && (
+                      <Animated.View
+                        style={[
+                          styles.budgetOverflowFill,
+                          {
+                            width: budgetProgressAnim.interpolate({
+                              inputRange: [0, 100],
+                              outputRange: ['0%', '100%'],
+                              extrapolate: 'clamp',
+                            }),
+                          }
+                        ]}
+                      />
+                    )}
                   </View>
                 </View>
                 <View style={styles.budgetDetails}>
                   <Text style={styles.budgetDetailText}>
-                    {t('reports.used') || "Used"}: ${reportData.budget_used?.toLocaleString() || "0"}
+                    {t('reports.used') || "Used"}: ${Math.abs(reportData.budget_used || 0).toLocaleString()}
                   </Text>
                   <Text style={styles.budgetDetailText}>
-                    {t('reports.remaining') || "Remaining"}: ${reportData.budget_remaining?.toLocaleString() || "0"}
+                    {t('reports.total') || "Total"}: ${Math.abs(reportData.budget_total || 0).toLocaleString()}
                   </Text>
                 </View>
-              </View>
+                <View style={styles.budgetDetailsSecondRow}>
+                  <Text style={[
+                    styles.budgetDetailText,
+                    { 
+                      color: (reportData.budget_remaining || 0) < 0 ? "#EF4444" : isDark ? "#9CA3AF" : "#6B7280",
+                      fontWeight: (reportData.budget_remaining || 0) < 0 ? "600" : "normal"
+                    }
+                  ]}>
+                    {(reportData.budget_remaining || 0) < 0 
+                      ? `${t('reports.over_budget') || "Over Budget"}: ${Math.abs(reportData.budget_remaining || 0).toLocaleString()}`
+                      : `${t('reports.remaining') || "Remaining"}: ${Math.abs(reportData.budget_remaining || 0).toLocaleString()}`
+                    }
+                  </Text>
+                  {(reportData.budget_percentage || 0) > 100 && (
+                    <Text style={[styles.budgetWarningText]}>
+                      {t('reports.budget_exceeded') || "Budget exceeded!"}
+                    </Text>
+                  )}
+                </View>
+              </Animated.View>
             )}
 
             {/* Income vs Expenses Chart */}
             {chartData.datasets[0].data.length > 0 && (
-              <View style={styles.chartSection}>
+              <Animated.View 
+                style={[
+                  styles.chartSection,
+                  {
+                    transform: [
+                      { scale: chartAnimRef },
+                      {
+                        translateY: chartAnimRef.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [50, 0],
+                        }),
+                      },
+                    ],
+                    opacity: chartAnimRef,
+                  },
+                ]}
+              >
                 <Text style={styles.sectionTitle}>{t('reports.income_vs_expenses') || "Income vs Expenses Trend"}</Text>
                 <View style={styles.chartContainer}>
                   <LineChart
@@ -628,22 +1086,40 @@ const ReportsScreen = ({ navigation }) => {
                     fromZero={false}
                   />
                   <View style={styles.chartLegend}>
-                    <View style={styles.legendItem}>
+                    <Animated.View 
+                      style={[
+                        styles.legendItem,
+                        { transform: [{ scale: pulseAnim }] }
+                      ]}
+                    >
                       <View style={[styles.legendDot, { backgroundColor: "#22C55E" }]} />
                       <Text style={styles.legendText}>{t('reports.income') || "Income"}</Text>
-                    </View>
-                    <View style={styles.legendItem}>
+                    </Animated.View>
+                    <Animated.View 
+                      style={[
+                        styles.legendItem,
+                        { transform: [{ scale: pulseAnim }] }
+                      ]}
+                    >
                       <View style={[styles.legendDot, { backgroundColor: "#EF4444" }]} />
                       <Text style={styles.legendText}>{t('reports.expenses') || "Expenses"}</Text>
-                    </View>
+                    </Animated.View>
                   </View>
                 </View>
-              </View>
+              </Animated.View>
             )}
 
             {/* Spending Categories Pie Chart */}
             {pieChartData.length > 0 && (
-              <View style={styles.chartSection}>
+              <Animated.View 
+                style={[
+                  styles.chartSection,
+                  {
+                    transform: [{ scale: chartAnimRef }],
+                    opacity: chartAnimRef,
+                  },
+                ]}
+              >
                 <Text style={styles.sectionTitle}>{t('reports.spending_by_categories') || "Spending by Categories"}</Text>
                 <View style={styles.chartContainer}>
                   <PieChart
@@ -657,39 +1133,50 @@ const ReportsScreen = ({ navigation }) => {
                     absolute
                   />
                 </View>
-              </View>
+              </Animated.View>
             )}
 
             {/* Transaction Statistics */}
-            <View style={styles.statsSection}>
+            <Animated.View 
+              style={[
+                styles.statsSection,
+                {
+                  transform: [{ scale: statsAnimRef }],
+                  opacity: statsAnimRef,
+                },
+              ]}
+            >
               <Text style={styles.sectionTitle}>{t('reports.transaction_statistics') || "Transaction Statistics"}</Text>
               <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {reportData.transaction_count || 0}
-                  </Text>
-                  <Text style={styles.statLabel}>{t('reports.total_transactions') || "Total Transactions"}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    ${reportData.average_transaction_amount?.toFixed(2) || "0.00"}
-                  </Text>
-                  <Text style={styles.statLabel}>{t('reports.average_amount') || "Average Amount"}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    ${reportData.largest_expense?.amount?.toLocaleString() || "0"}
-                  </Text>
-                  <Text style={styles.statLabel}>{t('reports.largest_expense') || "Largest Expense"}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {reportData.most_spending_category || t('common.not_available')}
-                  </Text>
-                  <Text style={styles.statLabel}>{t('reports.top_category') || "Top Category"}</Text>
-                </View>
+                {[
+                  { value: reportData.transaction_count || 0, label: t('reports.total_transactions') || "Total Transactions" },
+                  { value: `$${reportData.average_transaction_amount?.toFixed(2) || "0.00"}`, label: t('reports.average_amount') || "Average Amount" },
+                  { value: `$${reportData.largest_expense?.amount?.toLocaleString() || "0"}`, label: t('reports.largest_expense') || "Largest Expense" },
+                  { value: reportData.most_spending_category || t('common.not_available'), label: t('reports.top_category') || "Top Category" }
+                ].map((stat, index) => (
+                  <Animated.View 
+                    key={index}
+                    style={[
+                      styles.statItem,
+                      {
+                        transform: [
+                          {
+                            translateY: statsAnimRef.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [30, 0],
+                            }),
+                          },
+                          { scale: pulseAnim },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                    <Text style={styles.statLabel}>{stat.label}</Text>
+                  </Animated.View>
+                ))}
               </View>
-            </View>
+            </Animated.View>
 
             {/* Insights */}
             {reportData.insights && reportData.insights.length > 0 && (
@@ -697,7 +1184,26 @@ const ReportsScreen = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>{t('reports.financial_insights') || "Financial Insights"}</Text>
                 <View style={styles.insightsList}>
                   {reportData.insights.map((insight, index) => (
-                    <View key={index} style={styles.insightItem}>
+                    <Animated.View 
+                      key={index}
+                      style={[
+                        styles.insightItem,
+                        {
+                          transform: [
+                            {
+                              translateX: insightAnimations[index] ? insightAnimations[index].interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [100, 0],
+                              }) : 0,
+                            },
+                            {
+                              scale: insightAnimations[index] || new Animated.Value(1),
+                            },
+                          ],
+                          opacity: insightAnimations[index] || new Animated.Value(1),
+                        },
+                      ]}
+                    >
                       <View style={[
                         styles.insightIcon,
                         { backgroundColor: 
@@ -720,7 +1226,7 @@ const ReportsScreen = ({ navigation }) => {
                         <Text style={styles.insightTitle}>{insight.title}</Text>
                         <Text style={styles.insightText}>{insight.message}</Text>
                       </View>
-                    </View>
+                    </Animated.View>
                   ))}
                 </View>
               </View>
@@ -730,48 +1236,68 @@ const ReportsScreen = ({ navigation }) => {
 
         {/* Export Button */}
         <View style={styles.exportSection}>
-          <TouchableOpacity 
-            style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
-            onPress={handleExportReport}
-            activeOpacity={0.8}
-            disabled={exporting}
-          >
-            <LinearGradient
-              colors={exporting ? ["#9CA3AF", "#9CA3AF"] : ["#2563EB", "#3B82F6"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.exportGradient}
+          <Animated.View style={{ transform: [{ scale: exportButtonScale }] }}>
+            <TouchableOpacity 
+              style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
+              onPress={handleExportReport}
+              onPressIn={() => handleButtonPressIn(exportButtonScale)}
+              onPressOut={() => handleButtonPressOut(exportButtonScale)}
+              activeOpacity={0.8}
+              disabled={exporting}
             >
-              {exporting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Ionicons name="download-outline" size={20} color="#FFFFFF" />
-              )}
-              <Text style={styles.exportButtonText}>
-                {exporting ? (t('reports.exporting') || "Exporting...") : (t('reports.export_report') || "Export Report")}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={exporting ? ["#9CA3AF", "#9CA3AF"] : ["#2563EB", "#3B82F6"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.exportGradient}
+              >
+                {exporting ? (
+                  <Animated.View style={{ transform: [{ rotate: '360deg' }] }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  </Animated.View>
+                ) : (
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+                  </Animated.View>
+                )}
+                <Text style={styles.exportButtonText}>
+                  {exporting ? (t('reports.exporting') || "Exporting...") : (t('reports.export_report') || "Export Report")}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
           
           <TouchableOpacity 
             style={styles.viewExportsButton}
             onPress={() => navigation.navigate("Export Report")}
             activeOpacity={0.8}
           >
-            <Ionicons name="folder-outline" size={20} color="#2563EB" />
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons name="folder-outline" size={20} color="#2563EB" />
+            </Animated.View>
             <Text style={styles.viewExportsText}>{t('reports.view_all_exports') || "View All Exports"}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Empty State */}
         {!reportData && !loading && (
-          <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color={isDark ? "#6B7280" : "#9CA3AF"} />
+          <Animated.View 
+            style={[
+              styles.emptyState,
+              {
+                transform: [{ scale: fadeAnim }],
+                opacity: fadeAnim,
+              },
+            ]}
+          >
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons name="document-text-outline" size={64} color={isDark ? "#6B7280" : "#9CA3AF"} />
+            </Animated.View>
             <Text style={styles.emptyTitle}>{t('reports.no_data') || "No Report Data"}</Text>
             <Text style={styles.emptySubtitle}>{t('reports.no_data_subtitle') || "Start adding transactions to see your financial reports"}</Text>
-          </View>
+          </Animated.View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       <PeriodModal />
     </SafeAreaView>
@@ -935,6 +1461,35 @@ const getThemedStyles = (isDark) =>
     budgetDetails: {
       flexDirection: "row",
       justifyContent: "space-between",
+    },
+    budgetPercentageContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    overBudgetIndicator: {
+      backgroundColor: "#FEE2E2",
+      borderRadius: 12,
+      padding: 2,
+    },
+    budgetOverflowFill: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      height: "100%",
+      backgroundColor: "#EF4444",
+      borderRadius: 4,
+      opacity: 0.3,
+    },
+    budgetDetailsSecondRow: {
+      marginTop: 8,
+      alignItems: "flex-start",
+    },
+    budgetWarningText: {
+      fontSize: 12,
+      color: "#EF4444",
+      fontWeight: "600",
+      marginTop: 4,
     },
     budgetDetailText: {
       fontSize: 12,
