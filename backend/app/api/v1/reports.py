@@ -120,21 +120,82 @@ async def download_exported_report(
         db: Session = Depends(get_db)
 ):
     """Скачать экспортированный отчет"""
-    file_path = await ReportsService.get_export_file_path(
-        export_id, current_user.id, db
-    )
-
-    if not file_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Export file not found or expired"
+    import os
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Download request for export_id: {export_id}, user_id: {current_user.id}")
+    
+    try:
+        file_path = await ReportsService.get_export_file_path(
+            export_id, current_user.id, db
         )
+        
+        logger.info(f"File path from service: {file_path}")
+        
+        if not file_path:
+            logger.error(f"File path is None for export_id: {export_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Export file not found or expired"
+            )
+        
+        if not os.path.exists(file_path):
+            logger.error(f"File does not exist: {file_path}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Export file not found on disk"
+            )
 
-    return FileResponse(
-        file_path,
-        media_type='application/octet-stream',
-        filename=f"financial_report_{export_id}.pdf"
-    )
+        # Определяем тип файла и media type
+        file_extension = os.path.splitext(file_path)[1].lower()
+        logger.info(f"File extension: {file_extension}")
+        
+        if file_extension == '.pdf':
+            media_type = 'application/pdf'
+            filename = f"financial_report_{export_id}.pdf"
+        elif file_extension == '.csv':
+            media_type = 'text/csv'
+            filename = f"financial_report_{export_id}.csv"
+        elif file_extension == '.xlsx':
+            media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = f"financial_report_{export_id}.xlsx"
+        else:
+            media_type = 'application/octet-stream'
+            filename = f"financial_report_{export_id}{file_extension}"
+
+        # Проверим размер файла
+        file_size = os.path.getsize(file_path)
+        logger.info(f"File size: {file_size} bytes")
+        
+        if file_size == 0:
+            logger.error(f"File is empty: {file_path}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Export file is empty or corrupted"
+            )
+
+        logger.info(f"Returning file: {filename}, media_type: {media_type}, size: {file_size}")
+
+        return FileResponse(
+            file_path,
+            media_type=media_type,
+            filename=filename,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Content-Length": str(file_size),
+                "Cache-Control": "no-cache"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in download_exported_report: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during file download"
+        )
 
 
 @router.get("/exports", response_model=List[ExportedReport])

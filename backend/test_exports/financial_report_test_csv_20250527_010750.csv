@@ -1,0 +1,50 @@
+Financial Report - November 2024
+Generated on 2025-05-27 01:07:50
+
+FINANCIAL SUMMARY
+Metric,Amount
+Income,4200.00
+Expenses,2450.00
+Net Balance,1750.00
+Savings,5800.00
+Savings Rate (%),41.7
+Transaction Count,66
+
+BUDGET ANALYSIS
+Metric,Amount
+Total Budget,3000.00
+Used,2450.00
+Remaining,550.00
+Usage (%),81.7
+
+SPENDING BY CATEGORIES
+Category,Amount,Percentage,Transactions
+Food & Dining,850.50,34.7,25
+Transportation,420.00,17.1,12
+Shopping,380.75,15.6,8
+Entertainment,295.25,12.1,15
+Bills & Utilities,503.50,20.5,6
+
+INCOME VS EXPENSES DATA
+Date,Income,Expenses,Net
+2025-05-21,500.00,300.00,200.00
+2025-05-22,600.00,350.00,250.00
+2025-05-23,700.00,400.00,300.00
+2025-05-24,800.00,450.00,350.00
+2025-05-25,900.00,500.00,400.00
+2025-05-26,1000.00,550.00,450.00
+2025-05-27,1100.00,600.00,500.00
+
+WEEKLY TREND
+Week Start,Week End,Expenses
+2025-05-05,2025-05-11,600.00
+2025-05-12,2025-05-18,650.00
+2025-05-19,2025-05-25,700.00
+2025-05-26,2025-06-01,750.00
+Average Weekly Spending,,625.00
+
+FINANCIAL INSIGHTS
+Title,Message,Type
+Improved Savings,Your savings rate has improved by 15.4% since last month.,positive
+High Food Expenses,Food expenses are 12% higher than your average.,warning
+Budget Alert,Used 85% of your monthly budget. Consider reducing expenses.,alert

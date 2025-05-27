@@ -1,0 +1,42 @@
+FINANCIAL REPORT - November 2024
+==================================================
+
+SUMMARY:
+Income: $4,200.00
+Expenses: $2,450.00
+Net Balance: $1,750.00
+Savings: $5,800.00
+Savings Rate: 41.7%
+Transaction Count: 66
+
+BUDGET ANALYSIS:
+Total Budget: $3,000.00
+Used: $2,450.00 (81.7%)
+Remaining: $550.00
+
+SPENDING BY CATEGORIES:
+Food & Dining: $850.50 (34.7%) - 25 transactions
+Transportation: $420.00 (17.1%) - 12 transactions
+Shopping: $380.75 (15.6%) - 8 transactions
+Entertainment: $295.25 (12.1%) - 15 transactions
+Bills & Utilities: $503.50 (20.5%) - 6 transactions
+
+WEEKLY SPENDING TREND:
+05/05 - 05/11: $600.00
+05/12 - 05/18: $650.00
+05/19 - 05/25: $700.00
+05/26 - 06/01: $750.00
+Average Weekly Spending: $625.00
+Trend: +8.3%
+
+INSIGHTS:
+1. Improved Savings: Your savings rate has improved by 15.4% since last month.
+2. High Food Expenses: Food expenses are 12% higher than your average.
+3. Budget Alert: Used 85% of your monthly budget. Consider reducing expenses.
+
+ADDITIONAL STATISTICS:
+Average Transaction: $37.12
+Largest Expense: $125.75 (Food & Dining)
+Most Spending Category: Food & Dining
+
+Report generated on May 27, 2025 at 01:04 AM

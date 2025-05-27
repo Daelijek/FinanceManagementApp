@@ -382,35 +382,70 @@ class ReportsService:
             export_id: str, user_id: int, export_request: ExportReportRequest, db: Session
     ):
         """Генерация файла экспорта (фоновая задача)"""
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting export generation for ID: {export_id}")
+        
         try:
             # Получаем данные для отчета
             if export_request.report_type == "monthly_summary":
-                start_date = export_request.start_date or date.today().replace(day=1)
-                end_date = export_request.end_date or date.today()
+                if export_request.start_date and export_request.end_date:
+                    start_date = export_request.start_date
+                    end_date = export_request.end_date
+                else:
+                    # Текущий месяц
+                    today = date.today()
+                    start_date = date(today.year, today.month, 1)
+                    end_date = today
 
                 report_data = await ReportsService._generate_financial_summary(
-                    user_id, start_date, end_date, "Monthly Summary", db
+                    user_id, start_date, end_date, f"Monthly Summary ({start_date.strftime('%B %Y')})", db
                 )
             elif export_request.report_type == "weekly_summary":
                 report_data = await ReportsService.get_weekly_summary(user_id, db)
+            elif export_request.report_type == "custom_period":
+                if not export_request.start_date or not export_request.end_date:
+                    raise ValueError("Start date and end date are required for custom period reports")
+                report_data = await ReportsService._generate_financial_summary(
+                    user_id, export_request.start_date, export_request.end_date, 
+                    f"Custom Period ({export_request.start_date} - {export_request.end_date})", db
+                )
             else:
-                # Другие типы отчетов
-                report_data = await ReportsService.get_weekly_summary(user_id, db)
+                # Другие типы отчетов - используем месячный отчет как базу
+                report_data = await ReportsService.get_monthly_summary(user_id, date.today().year, date.today().month, db)
+
+            logger.info(f"Report data generated successfully for export {export_id}")
 
             # Генерируем файл
             export_dir = f"{settings.UPLOAD_DIR}/exports/{user_id}"
             os.makedirs(export_dir, exist_ok=True)
+            logger.info(f"Export directory created: {export_dir}")
 
+            file_path = None
             if export_request.format == "pdf":
+                from app.services.export_generator import PDFReportGenerator
                 file_path = await PDFReportGenerator.generate(
                     report_data, export_request.options, export_dir, export_id
                 )
             elif export_request.format == "csv":
+                from app.services.export_generator import CSVReportGenerator
                 file_path = await CSVReportGenerator.generate(
                     report_data, export_request.options, export_dir, export_id
                 )
+            elif export_request.format == "excel":
+                from app.services.export_generator import ExcelReportGenerator
+                file_path = await ExcelReportGenerator.generate(
+                    report_data, export_request.options, export_dir, export_id
+                )
             else:
-                raise ValueError("Unsupported export format")
+                raise ValueError(f"Unsupported export format: {export_request.format}")
+
+            if not file_path or not os.path.exists(file_path):
+                raise Exception(f"Failed to generate export file: {file_path}")
+
+            file_size = os.path.getsize(file_path)
+            logger.info(f"Export file generated successfully: {file_path}, size: {file_size} bytes")
 
             # Обновляем статус экспорта
             export_record = db.query(ExportModel).filter(
@@ -422,17 +457,26 @@ class ReportsService:
                 export_record.file_path = file_path
                 export_record.file_size = ReportsService._get_file_size(file_path)
                 db.commit()
+                logger.info(f"Export record updated successfully for ID: {export_id}")
+            else:
+                logger.error(f"Export record not found for ID: {export_id}")
 
         except Exception as e:
+            logger.error(f"Error generating export {export_id}: {str(e)}", exc_info=True)
+            
             # Обновляем статус на failed
-            export_record = db.query(ExportModel).filter(
-                ExportModel.export_id == export_id
-            ).first()
+            try:
+                export_record = db.query(ExportModel).filter(
+                    ExportModel.export_id == export_id
+                ).first()
 
-            if export_record:
-                export_record.status = "failed"
-                export_record.error_message = str(e)
-                db.commit()
+                if export_record:
+                    export_record.status = "failed"
+                    export_record.error_message = str(e)
+                    db.commit()
+                    logger.info(f"Export status updated to failed for ID: {export_id}")
+            except Exception as db_error:
+                logger.error(f"Failed to update export status: {str(db_error)}")
 
     @staticmethod
     async def get_recent_exports(user_id: int, limit: int, db: Session) -> List[ExportedReport]:

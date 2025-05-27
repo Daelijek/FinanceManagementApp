@@ -26,6 +26,12 @@ google-auth==2.33.0
 # Background Tasks and Scheduling
 apscheduler==3.10.4
 
+# PDF Generation
+reportlab==4.0.9
+
+# Excel Generation
+openpyxl==3.1.2
+
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1

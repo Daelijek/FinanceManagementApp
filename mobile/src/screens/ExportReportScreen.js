@@ -1,5 +1,3 @@
-// src/screens/ExportReportScreen.js - ОБНОВЛЕННАЯ ВЕРСИЯ С ПОЛНОЙ ИНТЕГРАЦИЕЙ БЭКЕНДА
-
 // src/screens/ExportReportScreen.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
 
 import React, { useContext, useState, useEffect } from "react";
@@ -17,6 +15,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -25,6 +24,7 @@ import { ThemeContext } from "../context/ThemeContext";
 import { apiFetch } from "../api";
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const ExportReportScreen = ({ navigation }) => {
   const { t } = useTranslation();
@@ -55,7 +55,6 @@ const ExportReportScreen = ({ navigation }) => {
   const [recentExports, setRecentExports] = useState([]);
   const [reportData, setReportData] = useState(null);
 
-  // Исправленный список типов отчетов
   const reportTypes = [
     { key: "weekly_summary", label: t('reports.weekly_summary') || "Weekly Financial Summary" },
     { key: "monthly_summary", label: t('reports.monthly_summary') || "Monthly Financial Summary" },
@@ -97,7 +96,6 @@ const ExportReportScreen = ({ navigation }) => {
       let endpoint = "/api/v1/reports/monthly-summary";
       const params = new URLSearchParams();
 
-      // Исправленная логика выбора эндпоинта
       switch (reportType) {
         case "weekly_summary":
           endpoint = "/api/v1/reports/weekly-summary";
@@ -109,7 +107,6 @@ const ExportReportScreen = ({ navigation }) => {
           break;
         case "quarterly_summary":
           endpoint = "/api/v1/reports/monthly-summary";
-          // Для квартального отчета используем текущий квартал
           const quarter = Math.floor(fromDate.getMonth() / 3) + 1;
           params.append('year', fromDate.getFullYear().toString());
           params.append('quarter', quarter.toString());
@@ -140,16 +137,14 @@ const ExportReportScreen = ({ navigation }) => {
 
       const url = params.toString() ? `${endpoint}?${params}` : endpoint;
       const response = await apiFetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      // Обработка данных в зависимости от типа отчета
+
       if (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") {
-        // Обрабатываем данные транзакций
         const transactions = data.transactions || [];
         let totalIncome = 0;
         let totalExpenses = 0;
@@ -160,7 +155,7 @@ const ExportReportScreen = ({ navigation }) => {
             totalIncome += Math.abs(tx.amount);
           } else if (tx.transaction_type === "expense") {
             totalExpenses += Math.abs(tx.amount);
-            
+
             const categoryName = tx.category_name || "Other";
             if (!categoryBreakdown[categoryName]) {
               categoryBreakdown[categoryName] = {
@@ -180,13 +175,12 @@ const ExportReportScreen = ({ navigation }) => {
           netBalance: totalIncome - totalExpenses,
           transactionCount: transactions.length,
           categoryBreakdown,
-          period: reportType === "custom_period" ? 
-            `${formatDate(fromDate)} - ${formatDate(toDate)}` : 
+          period: reportType === "custom_period" ?
+            `${formatDate(fromDate)} - ${formatDate(toDate)}` :
             getPeriodName(reportType),
           reportType
         });
       } else if (reportType === "budget_analysis") {
-        // Обрабатываем данные бюджета
         setReportData({
           totalIncome: 0,
           totalExpenses: data.spent || 0,
@@ -211,13 +205,12 @@ const ExportReportScreen = ({ navigation }) => {
           reportType
         });
       } else {
-        // Используем данные из готового отчета
         setReportData({
           totalIncome: data.income || 0,
           totalExpenses: data.expenses || 0,
           netBalance: data.net_balance || 0,
           transactionCount: data.transaction_count || 0,
-          categoryBreakdown: data.spending_categories ? 
+          categoryBreakdown: data.spending_categories ?
             data.spending_categories.reduce((acc, cat) => {
               acc[cat.category_name] = {
                 amount: cat.amount,
@@ -239,8 +232,7 @@ const ExportReportScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error fetching report data:', error);
       Alert.alert(t('common.error'), 'Failed to load report preview. Please try again.');
-      
-      // Устанавливаем пустые данные при ошибке
+
       setReportData({
         totalIncome: 0,
         totalExpenses: 0,
@@ -278,13 +270,13 @@ const ExportReportScreen = ({ navigation }) => {
 
   const getFileSize = (format) => {
     if (!reportData) return "~0 MB";
-    
+
     const baseSize = reportData.transactionCount * 0.001;
     const chartSize = includeCharts ? 0.5 : 0;
     const categoriesSize = includeCategories ? Object.keys(reportData.categoryBreakdown).length * 0.01 : 0;
-    
+
     const totalSize = baseSize + chartSize + categoriesSize;
-    
+
     if (format === "pdf") {
       return `~${Math.max(1.5, totalSize * 1.5).toFixed(1)} MB`;
     } else {
@@ -307,7 +299,7 @@ const ExportReportScreen = ({ navigation }) => {
     };
 
     const currentReportType = reportTypes.find(rt => rt.key === reportType);
-    
+
     Alert.alert(
       "Export Report",
       `Export ${currentReportType?.label || reportType} (${reportData.period}) as ${selectedFormat.toUpperCase()}?\n\nReport will include:\n• ${reportData.transactionCount} transactions\n• ${Object.keys(reportData.categoryBreakdown).length} categories\n• ${includeCharts ? 'Charts and graphs' : 'No charts'}\n• ${includeTransactions ? 'Transaction details' : 'Summary only'}`,
@@ -324,12 +316,14 @@ const ExportReportScreen = ({ navigation }) => {
       const exportRequest = {
         report_type: reportType,
         format: selectedFormat,
-        start_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ? 
+        start_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ?
           fromDate.toISOString().split('T')[0] : null,
-        end_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ? 
+        end_date: (reportType === "custom_period" || reportType === "transaction_details" || reportType === "category_breakdown") ?
           toDate.toISOString().split('T')[0] : null,
         options: options
       };
+
+      console.log('Sending export request:', exportRequest);
 
       const response = await apiFetch("/api/v1/reports/export", {
         method: "POST",
@@ -337,15 +331,15 @@ const ExportReportScreen = ({ navigation }) => {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to export report");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
       }
 
       const result = await response.json();
-      
+
       if (result.status === "processing") {
         Alert.alert(
-          "Export Started", 
+          "Export Started",
           `Your report is being generated. Export ID: ${result.export_id}\n\nYou can check the status or download it once ready.`,
           [
             { text: t('common.ok'), onPress: () => loadRecentExports() }
@@ -353,8 +347,10 @@ const ExportReportScreen = ({ navigation }) => {
         );
       } else if (result.download_url) {
         await downloadFile(result.download_url, result.export_id);
+      } else if (result.file_content) {
+        await saveFileFromBase64(result.file_content, result.export_id || Date.now().toString());
       }
-      
+
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert("Export Error", `Failed to export report: ${error.message}`);
@@ -363,78 +359,264 @@ const ExportReportScreen = ({ navigation }) => {
     }
   };
 
+  // Функция для скачивания файлов
   const downloadFile = async (url, exportId) => {
     try {
       const fileName = `financial_report_${exportId}.${selectedFormat}`;
-      const downloadResult = await FileSystem.downloadAsync(
-        url,
-        FileSystem.documentDirectory + fileName
-      );
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      console.log('Downloading file from:', url);
+      console.log('Saving to:', fileUri);
+
+      const downloadResult = await FileSystem.downloadAsync(url, fileUri);
+      console.log('Download result:', downloadResult);
 
       if (downloadResult.status === 200) {
+        const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+        console.log('File info:', fileInfo);
+
+        if (fileInfo.exists && fileInfo.size > 0) {
+          Alert.alert(
+            "Download Complete",
+            `Report downloaded successfully!\nFile size: ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB`,
+            [
+              {
+                text: "Save to Gallery",
+                onPress: async () => {
+                  try {
+                    const { status } = await MediaLibrary.requestPermissionsAsync();
+                    if (status === 'granted') {
+                      const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+                      await MediaLibrary.createAlbumAsync('Financial Reports', asset, false);
+                      Alert.alert("Success", "File saved to gallery!");
+                    } else {
+                      Alert.alert("Permission denied", "Cannot save to gallery without permission");
+                    }
+                  } catch (error) {
+                    console.error('Error saving to gallery:', error);
+                    Alert.alert("Error", "Failed to save to gallery");
+                  }
+                }
+              },
+              {
+                text: t('common.share'),
+                onPress: async () => {
+                  try {
+                    if (await Sharing.isAvailableAsync()) {
+                      await Sharing.shareAsync(downloadResult.uri, {
+                        mimeType: selectedFormat === 'pdf' ? 'application/pdf' : 'text/csv',
+                        dialogTitle: 'Share Financial Report'
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Error sharing file:', error);
+                    Alert.alert("Error", "Failed to share file");
+                  }
+                }
+              },
+              { text: t('common.ok') }
+            ]
+          );
+        } else {
+          Alert.alert("Error", "Downloaded file is empty or corrupted");
+        }
+      } else {
+        Alert.alert("Download Error", `Failed to download file. Status: ${downloadResult.status}`);
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      Alert.alert("Download Error", `Failed to download file: ${error.message}`);
+    }
+  };
+
+  // Функция для сохранения файла из base64
+  const saveFileFromBase64 = async (base64Content, exportId) => {
+    try {
+      const fileName = `financial_report_${exportId}.${selectedFormat}`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      await FileSystem.writeAsStringAsync(fileUri, base64Content, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const fileInfo = await FileSystem.getInfoAsync(fileUri);
+
+      if (fileInfo.exists && fileInfo.size > 0) {
         Alert.alert(
-          "Download Complete",
-          "Report downloaded successfully!",
+          "File Ready",
+          `Report created successfully!\nFile size: ${(fileInfo.size / 1024 / 1024).toFixed(2)} MB`,
           [
-            { text: t('common.ok') },
-            { 
-              text: t('common.share'), 
+            {
+              text: "Save to Gallery",
               onPress: async () => {
-                if (await Sharing.isAvailableAsync()) {
-                  await Sharing.shareAsync(downloadResult.uri);
+                try {
+                  const { status } = await MediaLibrary.requestPermissionsAsync();
+                  if (status === 'granted') {
+                    const asset = await MediaLibrary.createAssetAsync(fileUri);
+                    await MediaLibrary.createAlbumAsync('Financial Reports', asset, false);
+                    Alert.alert("Success", "File saved to gallery!");
+                  } else {
+                    Alert.alert("Permission denied", "Cannot save to gallery without permission");
+                  }
+                } catch (error) {
+                  console.error('Error saving to gallery:', error);
+                  Alert.alert("Error", "Failed to save to gallery");
                 }
               }
-            }
+            },
+            {
+              text: t('common.share'),
+              onPress: async () => {
+                try {
+                  if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(fileUri, {
+                      mimeType: selectedFormat === 'pdf' ? 'application/pdf' : 'text/csv',
+                      dialogTitle: 'Share Financial Report'
+                    });
+                  }
+                } catch (error) {
+                  console.error('Error sharing file:', error);
+                  Alert.alert("Error", "Failed to share file");
+                }
+              }
+            },
+            { text: t('common.ok') }
           ]
         );
       }
     } catch (error) {
-      console.error("Download error:", error);
-      Alert.alert("Download Error", "Failed to download file.");
+      console.error("Save error:", error);
+      Alert.alert("Save Error", "Failed to save file");
     }
   };
 
   const handleDownloadExport = async (exportItem) => {
     try {
-      const response = await apiFetch(`/api/v1/reports/export/${exportItem.export_id}/download`);
-      
-      if (response.ok) {
-        const blob = await response.blob();
-        const fileName = exportItem.file_name || `report_${exportItem.export_id}.${exportItem.format}`;
-        
-        // Создаем временный файл
-        const reader = new FileReader();
-        reader.onload = async () => {
+      console.log('Downloading export:', exportItem);
+
+      // Используем apiFetch для получения токена и заголовков
+      const downloadUrl = `/api/v1/reports/export/${exportItem.export_id}/download`;
+      console.log('Download URL:', downloadUrl);
+
+      const response = await apiFetch(downloadUrl, {
+        method: 'GET',
+      });
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        console.error('Download failed:', response.status, response.statusText);
+
+        if (response.status === 403) {
+          Alert.alert("Error", "Access denied. Please login again.");
+          return;
+        } else if (response.status === 404) {
+          Alert.alert("Error", "File not found or expired.");
+          return;
+        }
+
+        const errorText = await response.text().catch(() => 'Unknown error');
+        Alert.alert("Error", `Failed to download: ${errorText}`);
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentLength = response.headers.get('content-length');
+
+      console.log('Content type:', contentType);
+      console.log('Content length:', contentLength);
+
+      const fileName = exportItem.file_name || `report_${exportItem.export_id}.${exportItem.format}`;
+      const fileUri = FileSystem.documentDirectory + fileName;
+
+      const blob = await response.blob();
+      console.log('Blob size:', blob.size);
+
+      if (blob.size === 0) {
+        Alert.alert("Error", "Downloaded file is empty");
+        return;
+      }
+
+      const reader = new FileReader();
+
+      reader.onload = async () => {
+        try {
           const base64Data = reader.result.split(',')[1];
-          const fileUri = FileSystem.documentDirectory + fileName;
-          
+
           await FileSystem.writeAsStringAsync(fileUri, base64Data, {
             encoding: FileSystem.EncodingType.Base64,
           });
 
-          Alert.alert(
-            "Download Complete",
-            "Report downloaded successfully!",
-            [
-              { text: t('common.ok') },
-              { 
-                text: t('common.share'), 
-                onPress: async () => {
-                  if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(fileUri);
+          const fileInfo = await FileSystem.getInfoAsync(fileUri);
+          console.log('Saved file info:', fileInfo);
+
+          if (fileInfo.exists && fileInfo.size > 0) {
+            Alert.alert(
+              "Download Complete",
+              `Report downloaded successfully!\nFile: ${fileName}\nSize: ${(fileInfo.size / 1024).toFixed(1)} KB`,
+              [
+                {
+                  text: "Save to Files",
+                  onPress: async () => {
+                    try {
+                      // Передаём корректный URI сохранённого файла
+                      await Sharing.shareAsync(fileUri, {
+                        mimeType: exportItem.format === 'pdf' ? 'application/pdf' : 'text/csv',
+                        dialogTitle: 'Save Financial Report',
+                        UTI: exportItem.format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text'
+                      });
+                    } catch (err) {
+                      console.error('Error saving to files:', err);
+                      Alert.alert("Error", "Failed to save to files");
+                    }
                   }
-                }
-              }
-            ]
-          );
-        };
-        reader.readAsDataURL(blob);
-      } else {
-        Alert.alert("Error", "Failed to download export. File may have expired.");
-      }
+                },
+                {
+                  text: "Share",
+                  onPress: async () => {
+                    try {
+                      if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(fileUri, {
+                          mimeType: exportItem.format === 'pdf' ? 'application/pdf' : 'text/csv',
+                          dialogTitle: 'Share Financial Report'
+                        });
+                      }
+                    } catch (err) {
+                      console.error('Error sharing file:', err);
+                      Alert.alert("Error", "Failed to share file");
+                    }
+                  }
+                },
+                { text: "OK", style: "cancel" }
+              ]
+            );
+          } else {
+            Alert.alert("Error", "Failed to save file");
+          }
+
+        } catch (error) {
+          console.error('Error saving file:', error);
+          Alert.alert("Error", `Failed to save file: ${error.message}`);
+        }
+      };
+
+      reader.onerror = () => {
+        console.error('FileReader error');
+        Alert.alert("Error", "Failed to process downloaded file");
+      };
+
+      reader.readAsDataURL(blob);
+
     } catch (error) {
       console.error("Download error:", error);
-      Alert.alert("Download Error", "Failed to download file.");
+
+      if (error.message.includes('Network request failed')) {
+        Alert.alert("Network Error", "Please check your internet connection and that the server is running.");
+      } else if (error.message.includes('401') || error.message.includes('403')) {
+        Alert.alert("Authentication Error", "Please login again.");
+      } else {
+        Alert.alert("Download Error", `Failed to download file: ${error.message}`);
+      }
     }
   };
 
@@ -469,7 +651,7 @@ const ExportReportScreen = ({ navigation }) => {
       animationType="fade"
       onRequestClose={() => setShowReportTypePicker(false)}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.modalOverlay}
         activeOpacity={1}
         onPress={() => setShowReportTypePicker(false)}
@@ -507,13 +689,12 @@ const ExportReportScreen = ({ navigation }) => {
     </Modal>
   );
 
-  // Показываем выбор дат для custom_period, transaction_details и category_breakdown
   const shouldShowDatePicker = ["custom_period", "transaction_details", "category_breakdown"].includes(reportType);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -523,11 +704,11 @@ const ExportReportScreen = ({ navigation }) => {
           />
         }
       >
-        
+
         {/* Report Type Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Report Type</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.dropdown}
             onPress={() => setShowReportTypePicker(true)}
           >
@@ -545,7 +726,7 @@ const ExportReportScreen = ({ navigation }) => {
             <View style={styles.dateContainer}>
               <View style={styles.dateInputContainer}>
                 <Text style={styles.dateLabel}>From</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.dateInput}
                   onPress={() => setShowFromPicker(true)}
                 >
@@ -556,7 +737,7 @@ const ExportReportScreen = ({ navigation }) => {
 
               <View style={styles.dateInputContainer}>
                 <Text style={styles.dateLabel}>To</Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.dateInput}
                   onPress={() => setShowToPicker(true)}
                 >
@@ -627,7 +808,7 @@ const ExportReportScreen = ({ navigation }) => {
               <View style={styles.previewRow}>
                 <Text style={styles.previewLabel}>Net Balance:</Text>
                 <Text style={[
-                  styles.previewValue, 
+                  styles.previewValue,
                   { color: reportData.netBalance >= 0 ? "#10B981" : "#EF4444" }
                 ]}>
                   {reportData.netBalance >= 0 ? "+" : ""}${reportData.netBalance.toLocaleString()}
@@ -651,7 +832,7 @@ const ExportReportScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Export Format</Text>
           <View style={styles.formatContainer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.formatCard,
                 selectedFormat === "pdf" && styles.formatCardSelected
@@ -670,7 +851,7 @@ const ExportReportScreen = ({ navigation }) => {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.formatCard,
                 selectedFormat === "csv" && styles.formatCardSelected
@@ -694,7 +875,7 @@ const ExportReportScreen = ({ navigation }) => {
         {/* Export Options */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Export Options</Text>
-          
+
           <View style={styles.optionItem}>
             <Text style={styles.optionText}>Include Charts and Graphs</Text>
             <Switch
@@ -748,7 +929,7 @@ const ExportReportScreen = ({ navigation }) => {
 
         {/* Export Button */}
         <View style={styles.exportButtonContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
             onPress={handleExport}
             activeOpacity={0.8}
@@ -785,22 +966,22 @@ const ExportReportScreen = ({ navigation }) => {
             ) : (
               recentExports.map((item) => (
                 <View key={item.export_id} style={styles.recentItem}>
-                  <View style={[styles.recentIcon, { 
-                    backgroundColor: item.format === "pdf" ? "#FEE2E2" : "#D1FAE5" 
+                  <View style={[styles.recentIcon, {
+                    backgroundColor: item.format === "pdf" ? "#FEE2E2" : "#D1FAE5"
                   }]}>
-                    <Ionicons 
-                      name={item.format === "pdf" ? "document-text" : "grid"} 
-                      size={20} 
-                      color={item.format === "pdf" ? "#EF4444" : "#10B981"} 
+                    <Ionicons
+                      name={item.format === "pdf" ? "document-text" : "grid"}
+                      size={20}
+                      color={item.format === "pdf" ? "#EF4444" : "#10B981"}
                     />
                   </View>
                   <View style={styles.recentInfo}>
                     <Text style={styles.recentName}>{item.file_name || `${item.report_type}_${item.created_at}`}</Text>
                     <Text style={styles.recentDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
                     <Text style={styles.recentStatus}>
-                      Status: {item.status === "completed" ? "✅ Ready" : 
-                               item.status === "processing" ? "⏳ Processing" : 
-                               item.status === "failed" ? "❌ Failed" : "📋 " + item.status}
+                      Status: {item.status === "completed" ? "✅ Ready" :
+                        item.status === "processing" ? "⏳ Processing" :
+                          item.status === "failed" ? "❌ Failed" : "📋 " + item.status}
                     </Text>
                   </View>
                   <View style={styles.recentActions}>
