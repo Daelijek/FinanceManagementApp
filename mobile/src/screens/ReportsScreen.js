@@ -29,6 +29,7 @@ import { apiFetch } from "../api";
 import { useFocusEffect } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import ChatBotFAB from "../components/ChatBotFAB";
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android') {
@@ -62,18 +63,23 @@ const ReportsScreen = ({ navigation }) => {
   });
   const [pieChartData, setPieChartData] = useState([]);
 
-  // Animation references
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const headerAnim = useRef(new Animated.Value(0)).current;
-  const summaryCardsAnim = useRef(new Animated.Value(0)).current;
-  const balanceCardAnim = useRef(new Animated.Value(0)).current;
-  const chartAnimRef = useRef(new Animated.Value(0)).current;
-  const statsAnimRef = useRef(new Animated.Value(0)).current;
+  // Initialize animations - ТЕСТ: делаем видимыми для проверки
+  const fadeAnim = useRef(new Animated.Value(1)).current; // Тест: видимо
+  const slideAnim = useRef(new Animated.Value(0)).current; // Тест: на месте
+  const headerAnim = useRef(new Animated.Value(1)).current; // Тест: видимо
+  const summaryCardsAnim = useRef(new Animated.Value(1)).current; // Тест: видимо
+  const balanceCardAnim = useRef(new Animated.Value(1)).current; // Тест: видимо
+  const chartAnimRef = useRef(new Animated.Value(1)).current; // Тест: видимо
+  const statsAnimRef = useRef(new Animated.Value(1)).current; // Тест: видимо
   const exportButtonScale = useRef(new Animated.Value(1)).current;
   const modalAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const budgetProgressAnim = useRef(new Animated.Value(0)).current;
+
+  // Состояние для защиты от невидимости
+  const [hasDataLoaded, setHasDataLoaded] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
 
   // Insight cards animation values
   const insightAnimations = useRef([]).current;
@@ -93,87 +99,141 @@ const ReportsScreen = ({ navigation }) => {
     }
   };
 
-  // Start entrance animations
-  const startEntranceAnimations = useCallback(() => {
-    // Reset all animations
-    fadeAnim.setValue(0);
-    slideAnim.setValue(50);
-    headerAnim.setValue(0);
-    summaryCardsAnim.setValue(0);
-    balanceCardAnim.setValue(0);
-    chartAnimRef.setValue(0);
-    statsAnimRef.setValue(0);
-    budgetProgressAnim.setValue(0);
+  // ТЕСТ: Простая анимация которая точно работает
+  const testSimpleAnimation = useCallback(() => {
+    console.log("🧪 Testing simple animation");
 
-    // Staggered entrance animation
     Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
+      Animated.timing(exportButtonScale, {
+        toValue: 1.1,
+        duration: 200,
         useNativeDriver: true,
       }),
-      Animated.parallel([
-        Animated.timing(headerAnim, {
-          toValue: 1,
-          duration: 400,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.back(1.1)),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
+      Animated.timing(exportButtonScale, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      console.log("✅ Simple test animation completed!");
+    });
+  }, []);
 
-    // Summary cards animation with delay
-    setTimeout(() => {
-      Animated.spring(summaryCardsAnim, {
+  // Start entrance animations - теперь с анимациями ОТ видимого состояния
+  const startEntranceAnimations = useCallback(() => {
+    console.log("🎬 Starting entrance animations!");
+
+    if (!animationsEnabled) {
+      console.log("🚫 Animations disabled, skipping");
+      return;
+    }
+
+    // Тест простой анимации
+    testSimpleAnimation();
+
+    // Делаем "волновой" эффект появления
+    console.log("🎬 Starting wave effect");
+
+    // Заголовок - небольшое покачивание
+    Animated.sequence([
+      Animated.timing(headerAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(headerAnim, {
         toValue: 1,
         tension: 100,
         friction: 8,
         useNativeDriver: true,
-      }).start();
+      }),
+    ]).start(() => {
+      console.log("✅ Header wave completed");
+    });
+
+    // Карточки - масштабирование
+    setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(summaryCardsAnim, {
+          toValue: 0.9,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(summaryCardsAnim, {
+          toValue: 1,
+          tension: 80,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        console.log("✅ Summary cards wave completed");
+      });
+    }, 100);
+
+    // Баланс карточка
+    setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(balanceCardAnim, {
+          toValue: 0.95,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(balanceCardAnim, {
+          toValue: 1,
+          tension: 60,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        console.log("✅ Balance card wave completed");
+      });
     }, 200);
 
-    // Balance card animation with delay
+    // Графики
     setTimeout(() => {
-      Animated.spring(balanceCardAnim, {
-        toValue: 1,
-        tension: 80,
-        friction: 6,
-        useNativeDriver: true,
-      }).start();
+      Animated.sequence([
+        Animated.timing(chartAnimRef, {
+          toValue: 0.9,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(chartAnimRef, {
+          toValue: 1,
+          tension: 70,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        console.log("✅ Chart wave completed");
+      });
+    }, 300);
+
+    // Статистика
+    setTimeout(() => {
+      Animated.sequence([
+        Animated.timing(statsAnimRef, {
+          toValue: 0.85,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(statsAnimRef, {
+          toValue: 1,
+          tension: 90,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        console.log("✅ Stats wave completed");
+      });
     }, 400);
 
-    // Chart animation with delay
-    setTimeout(() => {
-      Animated.timing(chartAnimRef, {
-        toValue: 1,
-        duration: 600,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
-    }, 600);
-
-    // Stats animation with delay
-    setTimeout(() => {
-      Animated.spring(statsAnimRef, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        useNativeDriver: true,
-      }).start();
-    }, 800);
-  }, []);
+  }, [animationsEnabled, testSimpleAnimation]);
 
   // Animate insights with stagger
   const animateInsights = useCallback((insights) => {
     if (insights && insights.length > 0) {
       initializeInsightAnimations(insights.length);
-      
+
       insights.forEach((_, index) => {
         setTimeout(() => {
           Animated.spring(insightAnimations[index], {
@@ -260,10 +320,12 @@ const ReportsScreen = ({ navigation }) => {
 
   // Получение данных отчета с бэкенда
   const fetchReportData = useCallback(async () => {
+    console.log("🔄 fetchReportData started, selectedPeriod:", selectedPeriod);
+
     try {
       let endpoint = "/api/v1/reports/monthly-summary";
       let params = new URLSearchParams();
-      
+
       // Определяем правильный эндпоинт в зависимости от выбранного периода
       switch (selectedPeriod) {
         case "weekly":
@@ -286,22 +348,25 @@ const ReportsScreen = ({ navigation }) => {
       }
 
       const url = params.toString() ? `${endpoint}?${params}` : endpoint;
+      console.log("📡 API URL:", url);
+
       const response = await apiFetch(url);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+      console.log("✅ API Response received:", data);
+
       // Debug: проверяем данные о бюджете  
-      console.log("Budget data from API:", {
+      console.log("💰 Budget data from API:", {
         budget_total: data.budget_total,
         budget_used: data.budget_used,
         budget_remaining: data.budget_remaining,
         budget_percentage: data.budget_percentage
       });
-      
+
       // Безопасно устанавливаем данные отчета
       const safeReportData = {
         income: data.income || 0,
@@ -322,18 +387,38 @@ const ReportsScreen = ({ navigation }) => {
         daily_data: data.daily_data || []
       };
 
+      console.log("📊 Setting report data:", safeReportData);
       setReportData(safeReportData);
+      setHasDataLoaded(true);
 
-      // Start animations after data is set
+      // Запускаем красивые анимации через небольшую задержку
+      console.log("🎬 About to start animations in 50ms...");
       setTimeout(() => {
+        console.log("🎬 Calling startEntranceAnimations now!");
         startEntranceAnimations();
-        if (safeReportData.insights && safeReportData.insights.length > 0) {
-          setTimeout(() => animateInsights(safeReportData.insights), 1000);
-        }
-        if (safeReportData.budget_percentage > 0) {
-          setTimeout(() => animateBudgetProgress(safeReportData.budget_percentage), 1200);
-        }
-      }, 100);
+      }, 50);
+
+      // Insights анимации
+      if (safeReportData.insights && safeReportData.insights.length > 0) {
+        setTimeout(() => {
+          console.log("🎬 Starting insights animations");
+          animateInsights(safeReportData.insights);
+        }, 1200);
+      }
+
+      // Budget progress анимация
+      if (safeReportData.budget_percentage > 0) {
+        setTimeout(() => {
+          console.log("🎬 Starting budget progress animation");
+          animateBudgetProgress(safeReportData.budget_percentage);
+        }, 1400);
+      }
+
+      // Fallback: если анимации не сработали через 2 секунды, показываем контент принудительно
+      setTimeout(() => {
+        console.log("🛡️ Fallback activated - showing content");
+        setShowFallback(true);
+      }, 2000);
 
       // Обновляем данные для Line Chart (доходы vs расходы)
       await updateChartData(safeReportData);
@@ -341,11 +426,13 @@ const ReportsScreen = ({ navigation }) => {
       // Обновляем данные для Pie Chart (категории)
       updatePieChartData(safeReportData.spending_categories);
 
+      console.log("✅ fetchReportData completed successfully");
+
     } catch (error) {
-      console.error("Error fetching report data:", error);
-      
+      console.error("❌ Error fetching report data:", error);
+
       // Устанавливаем пустые данные в случае ошибки
-      setReportData({
+      const emptyData = {
         income: 0,
         expenses: 0,
         net_balance: 0,
@@ -362,11 +449,12 @@ const ReportsScreen = ({ navigation }) => {
         spending_categories: [],
         insights: [],
         daily_data: []
-      });
-      
+      };
+
+      setReportData(emptyData);
       setChartData({ labels: [], datasets: [{ data: [] }] });
       setPieChartData([]);
-      
+
       Alert.alert(t('common.error'), t('reports.failed_to_load') || "Failed to load report data. Please try again.");
     }
   }, [selectedPeriod, isDark, t, startEntranceAnimations, animateInsights, animateBudgetProgress]);
@@ -378,7 +466,7 @@ const ReportsScreen = ({ navigation }) => {
       if (reportData.daily_data && reportData.daily_data.length > 0) {
         const labels = reportData.daily_data.map(item => {
           const date = new Date(item.date);
-          return selectedPeriod === "weekly" ? 
+          return selectedPeriod === "weekly" ?
             date.toLocaleDateString('en', { weekday: 'short' }) :
             date.toLocaleDateString('en', { month: 'short', day: 'numeric' });
         });
@@ -412,10 +500,10 @@ const ReportsScreen = ({ navigation }) => {
 
       // Фильтруем транзакции по выбранному периоду
       const filteredTransactions = filterTransactionsByPeriod(transactions, selectedPeriod);
-      
+
       // Группируем по дням
       const dailyData = groupTransactionsByDay(filteredTransactions);
-      
+
       if (dailyData.length === 0) {
         setChartData({ labels: [], datasets: [{ data: [] }] });
         return;
@@ -423,7 +511,7 @@ const ReportsScreen = ({ navigation }) => {
 
       const labels = dailyData.map(item => {
         const date = new Date(item.date);
-        return selectedPeriod === "weekly" ? 
+        return selectedPeriod === "weekly" ?
           date.toLocaleDateString('en', { weekday: 'short' }) :
           date.toLocaleDateString('en', { month: 'short', day: 'numeric' });
       });
@@ -458,10 +546,10 @@ const ReportsScreen = ({ navigation }) => {
     }
 
     const colors = [
-      "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", 
+      "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0",
       "#9966FF", "#FF9F40", "#FF6384", "#C9CBCF"
     ];
-    
+
     const pieData = spendingCategories.slice(0, 6).map((category, index) => ({
       name: category.category_name || 'Unknown',
       amount: Math.abs(category.amount || 0),
@@ -469,7 +557,7 @@ const ReportsScreen = ({ navigation }) => {
       legendFontColor: isDark ? "#FFFFFF" : "#000000",
       legendFontSize: 12,
     }));
-    
+
     setPieChartData(pieData);
   }, [isDark]);
 
@@ -502,28 +590,28 @@ const ReportsScreen = ({ navigation }) => {
   const filterTransactionsByPeriod = (transactions, period) => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     return transactions.filter(tx => {
       const txDate = new Date(tx.transaction_date);
-      
+
       switch (period) {
         case "weekly":
           const weekAgo = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
           return txDate >= weekAgo;
-          
+
         case "monthly":
           const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
           return txDate >= startOfMonth;
-          
+
         case "quarterly":
           const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
           const startOfQuarter = new Date(now.getFullYear(), quarterStartMonth, 1);
           return txDate >= startOfQuarter;
-          
+
         case "yearly":
           const startOfYear = new Date(now.getFullYear(), 0, 1);
           return txDate >= startOfYear;
-          
+
         default:
           return true;
       }
@@ -532,20 +620,20 @@ const ReportsScreen = ({ navigation }) => {
 
   const groupTransactionsByDay = (transactions) => {
     const dailyMap = {};
-    
+
     transactions.forEach(tx => {
       const date = new Date(tx.transaction_date).toDateString();
       if (!dailyMap[date]) {
         dailyMap[date] = { date, income: 0, expenses: 0 };
       }
-      
+
       if (tx.transaction_type === "income") {
         dailyMap[date].income += Math.abs(tx.amount);
       } else if (tx.transaction_type === "expense") {
         dailyMap[date].expenses += Math.abs(tx.amount);
       }
     });
-    
+
     return Object.values(dailyMap).sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
@@ -569,7 +657,7 @@ const ReportsScreen = ({ navigation }) => {
 
   const exportReport = async (format) => {
     setExporting(true);
-    
+
     try {
       const exportData = {
         report_type: selectedPeriod === "weekly" ? "weekly_summary" : "monthly_summary",
@@ -593,10 +681,10 @@ const ReportsScreen = ({ navigation }) => {
       }
 
       const result = await response.json();
-      
+
       if (result.status === "processing") {
         Alert.alert(
-          t('reports.export_started') || "Export Started", 
+          t('reports.export_started') || "Export Started",
           t('reports.export_processing') || "Your report is being generated. You can download it from the Export Report screen.",
           [
             { text: t('common.ok') },
@@ -628,8 +716,8 @@ const ReportsScreen = ({ navigation }) => {
           t('reports.download_success') || "Report downloaded successfully!",
           [
             { text: t('common.ok') },
-            { 
-              text: t('common.share'), 
+            {
+              text: t('common.share'),
               onPress: async () => {
                 if (await Sharing.isAvailableAsync()) {
                   await Sharing.shareAsync(downloadResult.uri);
@@ -646,10 +734,12 @@ const ReportsScreen = ({ navigation }) => {
   };
 
   const onRefresh = useCallback(async () => {
+    console.log("🔄 onRefresh triggered");
     setRefreshing(true);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     await fetchReportData();
     setRefreshing(false);
+    console.log("✅ onRefresh completed");
   }, [fetchReportData]);
 
   const handlePeriodChange = useCallback((newPeriod) => {
@@ -670,19 +760,19 @@ const ReportsScreen = ({ navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      fetchReportData();
+      // Просто загружаем данные, без сброса анимаций
+      console.log("🎯 useFocusEffect triggered");
+      setLoading(true);
+      setHasDataLoaded(false);
+      setShowFallback(false);
+      fetchReportData().finally(() => {
+        console.log("✅ fetchReportData completed, setting loading to false");
+        setLoading(false);
+      });
     }, [fetchReportData])
   );
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchReportData();
-      setLoading(false);
-    };
-
-    loadData();
-  }, [fetchReportData]);
+  // Убираем дублирующий useEffect для начальной загрузки
 
   // Start pulse animation on component mount
   useEffect(() => {
@@ -713,12 +803,12 @@ const ReportsScreen = ({ navigation }) => {
       animationType="none"
       onRequestClose={hideModal}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.modalOverlay}
         activeOpacity={1}
         onPress={hideModal}
       >
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalContent,
             {
@@ -791,22 +881,26 @@ const ReportsScreen = ({ navigation }) => {
   );
 
   if (loading) {
+    console.log("🔄 Rendering loading state");
     return (
       <SafeAreaView style={styles.container}>
-        <Animated.View style={[styles.loadingContainer, { opacity: fadeAnim }]}>
+        <View style={[styles.loadingContainer, { opacity: 1 }]}>
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <ActivityIndicator size="large" color="#2563EB" />
           </Animated.View>
           <Text style={styles.loadingText}>{t('common.loading')}</Text>
-        </Animated.View>
+        </View>
       </SafeAreaView>
     );
   }
 
+  console.log("📱 Rendering main content, reportData exists:", !!reportData);
+  console.log("📊 Report data:", reportData);
+
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView
-        style={[styles.content, { opacity: fadeAnim }]}
+      <ScrollView
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -817,7 +911,7 @@ const ReportsScreen = ({ navigation }) => {
         }
       >
         {/* Header */}
-        <Animated.View 
+        <Animated.View
           style={[
             styles.header,
             {
@@ -825,13 +919,13 @@ const ReportsScreen = ({ navigation }) => {
                 { translateY: slideAnim },
                 { scale: headerAnim },
               ],
-              opacity: headerAnim,
+              opacity: showFallback ? 1 : headerAnim, // Fallback защита
             },
           ]}
         >
           <Text style={styles.headerTitle}>{t('reports.title') || "Financial Reports"}</Text>
           <Animated.View style={{ transform: [{ scale: exportButtonScale }] }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.headerButton}
               onPress={showModal}
               onPressIn={() => handleButtonPressIn(exportButtonScale)}
@@ -860,16 +954,16 @@ const ReportsScreen = ({ navigation }) => {
         {reportData && (
           <>
             {/* Summary Cards */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.summaryContainer,
                 {
                   transform: [{ scale: summaryCardsAnim }],
-                  opacity: summaryCardsAnim,
+                  opacity: showFallback ? 1 : summaryCardsAnim, // Fallback защита
                 },
               ]}
             >
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.summaryCard,
                   {
@@ -891,7 +985,7 @@ const ReportsScreen = ({ navigation }) => {
                 <Text style={styles.summaryPeriod}>{reportData.period_name}</Text>
               </Animated.View>
 
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.summaryCard,
                   {
@@ -915,7 +1009,7 @@ const ReportsScreen = ({ navigation }) => {
             </Animated.View>
 
             {/* Net Balance Card */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.balanceCard,
                 {
@@ -928,19 +1022,19 @@ const ReportsScreen = ({ navigation }) => {
                       }),
                     },
                   ],
-                  opacity: balanceCardAnim,
+                  opacity: showFallback ? 1 : balanceCardAnim, // Fallback защита
                 },
               ]}
             >
               <LinearGradient
                 colors={reportData.net_balance >= 0 ? ["#22C55E", "#16A34A"] : ["#EF4444", "#DC2626"]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}  
+                end={{ x: 1, y: 1 }}
                 style={styles.balanceGradient}
               >
                 <View style={styles.balanceContent}>
                   <Text style={styles.balanceLabel}>{t('reports.net_balance') || "Net Balance"}</Text>
-                  <Animated.Text 
+                  <Animated.Text
                     style={[
                       styles.balanceAmount,
                       { transform: [{ scale: pulseAnim }] }
@@ -957,22 +1051,22 @@ const ReportsScreen = ({ navigation }) => {
 
             {/* Budget Status */}
             {(reportData.budget_total > 0 || reportData.budget_used > 0) && (
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.budgetCard,
                   {
                     transform: [{ scale: balanceCardAnim }],
-                    opacity: balanceCardAnim,
+                    opacity: showFallback ? 1 : balanceCardAnim, // Fallback защита
                   },
                 ]}
               >
                 <View style={styles.budgetHeader}>
                   <Text style={styles.budgetTitle}>{t('reports.budget_status') || "Budget Status"}</Text>
                   <View style={styles.budgetPercentageContainer}>
-                    <Animated.Text 
+                    <Animated.Text
                       style={[
                         styles.budgetPercentage,
-                        { 
+                        {
                           transform: [{ scale: pulseAnim }],
                           color: getBudgetPercentageColor(reportData.budget_percentage || 0)
                         }
@@ -992,7 +1086,7 @@ const ReportsScreen = ({ navigation }) => {
                     <Animated.View
                       style={[
                         styles.budgetProgressFill,
-                        { 
+                        {
                           width: budgetProgressAnim.interpolate({
                             inputRange: [0, 100],
                             outputRange: ['0%', '100%'],
@@ -1030,12 +1124,12 @@ const ReportsScreen = ({ navigation }) => {
                 <View style={styles.budgetDetailsSecondRow}>
                   <Text style={[
                     styles.budgetDetailText,
-                    { 
+                    {
                       color: (reportData.budget_remaining || 0) < 0 ? "#EF4444" : isDark ? "#9CA3AF" : "#6B7280",
                       fontWeight: (reportData.budget_remaining || 0) < 0 ? "600" : "normal"
                     }
                   ]}>
-                    {(reportData.budget_remaining || 0) < 0 
+                    {(reportData.budget_remaining || 0) < 0
                       ? `${t('reports.over_budget') || "Over Budget"}: ${Math.abs(reportData.budget_remaining || 0).toLocaleString()}`
                       : `${t('reports.remaining') || "Remaining"}: ${Math.abs(reportData.budget_remaining || 0).toLocaleString()}`
                     }
@@ -1051,7 +1145,7 @@ const ReportsScreen = ({ navigation }) => {
 
             {/* Income vs Expenses Chart */}
             {chartData.datasets[0].data.length > 0 && (
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.chartSection,
                   {
@@ -1064,7 +1158,7 @@ const ReportsScreen = ({ navigation }) => {
                         }),
                       },
                     ],
-                    opacity: chartAnimRef,
+                    opacity: showFallback ? 1 : chartAnimRef, // Fallback защита
                   },
                 ]}
               >
@@ -1086,7 +1180,7 @@ const ReportsScreen = ({ navigation }) => {
                     fromZero={false}
                   />
                   <View style={styles.chartLegend}>
-                    <Animated.View 
+                    <Animated.View
                       style={[
                         styles.legendItem,
                         { transform: [{ scale: pulseAnim }] }
@@ -1095,7 +1189,7 @@ const ReportsScreen = ({ navigation }) => {
                       <View style={[styles.legendDot, { backgroundColor: "#22C55E" }]} />
                       <Text style={styles.legendText}>{t('reports.income') || "Income"}</Text>
                     </Animated.View>
-                    <Animated.View 
+                    <Animated.View
                       style={[
                         styles.legendItem,
                         { transform: [{ scale: pulseAnim }] }
@@ -1111,12 +1205,12 @@ const ReportsScreen = ({ navigation }) => {
 
             {/* Spending Categories Pie Chart */}
             {pieChartData.length > 0 && (
-              <Animated.View 
+              <Animated.View
                 style={[
                   styles.chartSection,
                   {
                     transform: [{ scale: chartAnimRef }],
-                    opacity: chartAnimRef,
+                    opacity: showFallback ? 1 : chartAnimRef, // Fallback защита
                   },
                 ]}
               >
@@ -1137,12 +1231,12 @@ const ReportsScreen = ({ navigation }) => {
             )}
 
             {/* Transaction Statistics */}
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.statsSection,
                 {
                   transform: [{ scale: statsAnimRef }],
-                  opacity: statsAnimRef,
+                  opacity: showFallback ? 1 : statsAnimRef, // Fallback защита
                 },
               ]}
             >
@@ -1154,7 +1248,7 @@ const ReportsScreen = ({ navigation }) => {
                   { value: `$${reportData.largest_expense?.amount?.toLocaleString() || "0"}`, label: t('reports.largest_expense') || "Largest Expense" },
                   { value: reportData.most_spending_category || t('common.not_available'), label: t('reports.top_category') || "Top Category" }
                 ].map((stat, index) => (
-                  <Animated.View 
+                  <Animated.View
                     key={index}
                     style={[
                       styles.statItem,
@@ -1184,7 +1278,7 @@ const ReportsScreen = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>{t('reports.financial_insights') || "Financial Insights"}</Text>
                 <View style={styles.insightsList}>
                   {reportData.insights.map((insight, index) => (
-                    <Animated.View 
+                    <Animated.View
                       key={index}
                       style={[
                         styles.insightItem,
@@ -1206,19 +1300,20 @@ const ReportsScreen = ({ navigation }) => {
                     >
                       <View style={[
                         styles.insightIcon,
-                        { backgroundColor: 
-                          insight.type === "positive" ? "#DCFCE7" :
-                          insight.type === "warning" ? "#FEF3C7" :
-                          insight.type === "alert" ? "#FEE2E2" : "#E0E7FF"
+                        {
+                          backgroundColor:
+                            insight.type === "positive" ? "#DCFCE7" :
+                              insight.type === "warning" ? "#FEF3C7" :
+                                insight.type === "alert" ? "#FEE2E2" : "#E0E7FF"
                         }
                       ]}>
-                        <Ionicons 
-                          name={insight.icon || "information-circle"} 
-                          size={20} 
+                        <Ionicons
+                          name={insight.icon || "information-circle"}
+                          size={20}
                           color={
                             insight.type === "positive" ? "#16A34A" :
-                            insight.type === "warning" ? "#D97706" :
-                            insight.type === "alert" ? "#DC2626" : "#2563EB"
+                              insight.type === "warning" ? "#D97706" :
+                                insight.type === "alert" ? "#DC2626" : "#2563EB"
                           }
                         />
                       </View>
@@ -1237,7 +1332,7 @@ const ReportsScreen = ({ navigation }) => {
         {/* Export Button */}
         <View style={styles.exportSection}>
           <Animated.View style={{ transform: [{ scale: exportButtonScale }] }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.exportButton, exporting && styles.exportButtonDisabled]}
               onPress={handleExportReport}
               onPressIn={() => handleButtonPressIn(exportButtonScale)}
@@ -1266,8 +1361,8 @@ const ReportsScreen = ({ navigation }) => {
               </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.viewExportsButton}
             onPress={() => navigation.navigate("Export Report")}
             activeOpacity={0.8}
@@ -1281,25 +1376,18 @@ const ReportsScreen = ({ navigation }) => {
 
         {/* Empty State */}
         {!reportData && !loading && (
-          <Animated.View 
-            style={[
-              styles.emptyState,
-              {
-                transform: [{ scale: fadeAnim }],
-                opacity: fadeAnim,
-              },
-            ]}
-          >
+          <View style={styles.emptyState}>
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <Ionicons name="document-text-outline" size={64} color={isDark ? "#6B7280" : "#9CA3AF"} />
             </Animated.View>
             <Text style={styles.emptyTitle}>{t('reports.no_data') || "No Report Data"}</Text>
             <Text style={styles.emptySubtitle}>{t('reports.no_data_subtitle') || "Start adding transactions to see your financial reports"}</Text>
-          </Animated.View>
+          </View>
         )}
-      </Animated.ScrollView>
+      </ScrollView>
 
       <PeriodModal />
+      <ChatBotFAB navigation={navigation} />
     </SafeAreaView>
   );
 };
