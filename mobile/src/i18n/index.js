@@ -360,7 +360,23 @@ const resources = {
                 no_data_subtitle: "Start adding transactions to see your financial reports",
                 no_data_to_export: "No report data available to export.",
                 choose_export_format: "Choose export format:"
-            }
+            },
+            chatbot: {
+                welcome: "Hi! I'm your financial assistant. How can I help you today?",
+                financial_assistant: "Financial Assistant",
+                online: "Online",
+                typing: "Typing...",
+                type_message: "Type your message...",
+                input_hint: "Ask about budgets, expenses, savings, or get help",
+                quick_questions: "Quick questions:",
+                check_budget: "Check my budget",
+                analyze_expenses: "Analyze my expenses",
+                savings_tips: "Savings tips",
+                help: "Help & Support",
+                ask_assistant: "Ask Assistant",
+                clear_chat: "Clear Chat",
+                clear_chat_confirm: "Are you sure you want to clear the chat history?"
+            },
         }
     },
     ru: {
@@ -720,7 +736,23 @@ const resources = {
                 no_data_subtitle: "Начните добавлять транзакции, чтобы увидеть финансовые отчеты",
                 no_data_to_export: "Нет данных отчета для экспорта.",
                 choose_export_format: "Выберите формат экспорта:"
-            }
+            },
+            chatbot: {
+                welcome: "Здравствуйте! Я ваш финансовый помощник. Чем могу помочь?",
+                financial_assistant: "Финансовый помощник",
+                online: "Онлайн",
+                typing: "Печатает...",
+                type_message: "Введите ваше сообщение...",
+                input_hint: "Спросите о бюджете, расходах, сбережениях или получите помощь",
+                quick_questions: "Быстрые вопросы:",
+                check_budget: "Проверить мой бюджет",
+                analyze_expenses: "Анализировать мои расходы",
+                savings_tips: "Советы по сбережениям",
+                help: "Помощь и поддержка",
+                ask_assistant: "Спросить помощника",
+                clear_chat: "Очистить чат",
+                clear_chat_confirm: "Вы уверены, что хотите очистить историю чата?"
+            },
         }
     },
     kz: {
@@ -1080,7 +1112,23 @@ const resources = {
                 no_data_subtitle: "Қаржылық есептерді көру үшін транзакциялар қосуды бастаңыз",
                 no_data_to_export: "Экспортқа арналған есеп деректері жоқ.",
                 choose_export_format: "Экспорт форматын таңдаңыз:"
-            }
+            },
+            chatbot: {
+                welcome: "Сәлеметсіз бе! Мен сіздің қаржылық көмекшіңізбін. Қалай көмектесе аламын?",
+                financial_assistant: "Қаржылық көмекші",
+                online: "Желіде",
+                typing: "Жазып жатыр...",
+                type_message: "Хабарламаңызды жазыңыз...",
+                input_hint: "Бюджет, шығын, жинақ немесе көмек туралы сұраңыз",
+                quick_questions: "Жылдам сұрақтар:",
+                check_budget: "Бюджетімді тексеру",
+                analyze_expenses: "Шығындарымды талдау",
+                savings_tips: "Жинақ бойынша кеңестер",
+                help: "Көмек және қолдау",
+                ask_assistant: "Көмекшіден сұрау",
+                clear_chat: "Чатты тазарту",
+                clear_chat_confirm: "Чат тарихын өшіргіңіз келетініне сенімдісіз бе?"
+            },
         }
     }
 };

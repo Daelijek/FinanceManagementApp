@@ -31,6 +31,7 @@ import SetBudgetScreen from "../screens/SetBudgetScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 import AllBudgetsScreen from "../screens/AllBudgetsScreen";
 import ExportReportScreen from "../screens/ExportReportScreen";
+import ChatBotScreen from "../screens/ChatBotScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -173,6 +174,11 @@ const AppNavigator = () => {
         name="Export Report"
         component={ExportReportScreen}
         options={makeBackOptions}
+      />
+
+      <Stack.Screen
+        name="Chat Bot"
+        component={ChatBotScreen}
       />
     </Stack.Navigator>
   );
