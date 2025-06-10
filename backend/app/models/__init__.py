@@ -6,10 +6,12 @@ from app.models.transaction import Transaction
 from app.models.notification import Notification, NotificationTypeEnum, NotificationCategoryEnum
 from app.models.budget import Budget, BudgetPeriodEnum
 from app.models.export import ExportedReport
+from app.models.chat import ChatMessage, ChatSession
 
 __all__ = [
     "User", "UserProfile", "FinancialData", "BankAccount",
     "BudgetCategory", "Transaction", "Notification",
     "NotificationTypeEnum", "NotificationCategoryEnum",
-    "Budget", "BudgetPeriodEnum", "ExportedReport"
+    "Budget", "BudgetPeriodEnum", "ExportedReport",
+    "ChatMessage", "ChatSession"
 ]
