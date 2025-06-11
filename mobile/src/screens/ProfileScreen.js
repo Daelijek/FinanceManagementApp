@@ -7,12 +7,14 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../context/ThemeContext";
 import { useTranslation } from 'react-i18next';
 import { apiFetch } from "../api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ProfileScreen = ({ navigation }) => {
   const [userName, setUserName] = useState("");
@@ -61,6 +63,78 @@ const ProfileScreen = ({ navigation }) => {
       case "trial": return t('profile.trial_member');
       default: return t('profile.no_subscription');
     }
+  };
+
+  // Функция выхода из аккаунта
+  const handleLogout = () => {
+    Alert.alert(
+      t('profile.logout_title') || "Выход из аккаунта",
+      t('profile.logout_message') || "Вы уверены, что хотите выйти из аккаунта?",
+      [
+        {
+          text: t('common.cancel') || "Отмена",
+          style: "cancel",
+        },
+        {
+          text: t('profile.logout') || "Выйти",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("🚪 Starting logout process...");
+              
+              // Показываем индикатор загрузки
+              setLoading(true);
+              
+              // Опционально: отправляем запрос на сервер для завершения сессии
+              try {
+                const res = await apiFetch("/api/v1/auth/logout", {
+                  method: "POST",
+                });
+                if (!res.ok) {
+                  console.warn("⚠️ Server logout failed, but continuing with local logout");
+                }
+              } catch (serverError) {
+                console.warn("⚠️ Server logout error:", serverError);
+                // Продолжаем с локальным выходом даже если сервер недоступен
+              }
+              
+              // Очищаем локальные данные
+              await AsyncStorage.multiRemove([
+                'token',
+                'refreshToken',
+                'user',
+                'userPreferences',
+                // Добавьте сюда другие ключи которые нужно очистить
+              ]);
+              
+              console.log("✅ Local data cleared");
+              
+              // Сбрасываем состояние компонента
+              setUserName("");
+              setEmail("");
+              setSubscription("");
+              
+              console.log("🔄 Navigating to Login screen");
+              
+              // Переходим к экрану входа и очищаем стек навигации
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+              
+            } catch (error) {
+              console.error("❌ Logout error:", error);
+              Alert.alert(
+                t('common.error') || "Ошибка",
+                t('profile.logout_error') || "Произошла ошибка при выходе из аккаунта. Попробуйте еще раз."
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -303,6 +377,40 @@ const ProfileScreen = ({ navigation }) => {
               />
             </TouchableOpacity>
           </View>
+
+          {/* КНОПКА ВЫХОДА ИЗ АККАУНТА */}
+          <View style={styles.logoutSection}>
+            <TouchableOpacity 
+              style={styles.logoutButton} 
+              onPress={handleLogout}
+              disabled={loading}
+            >
+              <View style={styles.logoutItemGroup}>
+                <Ionicons 
+                  name="log-out-outline" 
+                  size={24} 
+                  color={loading ? "#94A3B8" : "#EF4444"} 
+                />
+                <Text style={[
+                  styles.logoutText,
+                  { color: loading ? "#94A3B8" : "#EF4444" }
+                ]}>
+                  {loading 
+                    ? (t('profile.logging_out') || "Выход...") 
+                    : (t('profile.logout') || "Выйти из аккаунта")
+                  }
+                </Text>
+              </View>
+              {!loading && (
+                <Ionicons
+                  name="chevron-forward-outline"
+                  size={24}
+                  color="#EF4444"
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.version}>
             <Text style={styles.versionTitle}>{t('profile.version')}</Text>
           </View>
@@ -451,6 +559,31 @@ const getThemedStyles = (isDark) =>
       borderBottomWidth: 1,
       borderColor: isDark ? "#374151" : "#F3F4F6",
       justifyContent: "space-between",
+    },
+    // СТИЛИ ДЛЯ СЕКЦИИ ВЫХОДА
+    logoutSection: {
+      marginTop: 30,
+      paddingTop: 20,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? "#374151" : "#F3F4F6",
+    },
+    logoutButton: {
+      width: "95%",
+      paddingHorizontal: 20,
+      flexDirection: "row",
+      alignItems: "center",
+      height: 57,
+      justifyContent: "space-between",
+      alignSelf: "center",
+    },
+    logoutItemGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    logoutText: {
+      marginLeft: 12,
+      fontSize: 16,
+      fontWeight: "500",
     },
     version: {
       marginTop: 50,

@@ -16,11 +16,13 @@ import {
     Animated,
     Easing,
     Alert,
+    RefreshControl,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from 'react-i18next';
 import { ThemeContext } from "../context/ThemeContext";
+import { apiFetch } from "../api";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -31,55 +33,28 @@ const ChatBotScreen = ({ navigation }) => {
     const styles = getThemedStyles(isDark);
 
     // Chat state
+    const [currentSession, setCurrentSession] = useState(null);
     const [messages, setMessages] = useState([]);
     const [inputText, setInputText] = useState("");
     const [isTyping, setIsTyping] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [showQuickReplies, setShowQuickReplies] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [sending, setSending] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(true);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
     // Animation references
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const inputScaleAnim = useRef(new Animated.Value(1)).current;
     const typingAnimRef = useRef(new Animated.Value(0)).current;
-    const quickRepliesAnim = useRef(new Animated.Value(1)).current;
+    const suggestionsAnim = useRef(new Animated.Value(1)).current;
 
     // Refs
     const scrollViewRef = useRef(null);
     const inputRef = useRef(null);
     const messageAnimations = useRef([]).current;
-
-    // Welcome message and quick replies
-    const welcomeMessage = {
-        id: 'welcome',
-        text: t('chatbot.welcome') || "Hi! I'm your financial assistant. How can I help you today?",
-        isBot: true,
-        timestamp: new Date(),
-        type: 'text'
-    };
-
-    const quickReplies = [
-        {
-            id: 'budget',
-            text: t('chatbot.check_budget') || "Check my budget",
-            icon: "wallet-outline"
-        },
-        {
-            id: 'expenses',
-            text: t('chatbot.analyze_expenses') || "Analyze my expenses",
-            icon: "analytics-outline"
-        },
-        {
-            id: 'savings',
-            text: t('chatbot.savings_tips') || "Savings tips",
-            icon: "trending-up-outline"
-        },
-        {
-            id: 'help',
-            text: t('chatbot.help') || "Help & Support",
-            icon: "help-circle-outline"
-        }
-    ];
 
     // Initialize message animations
     const initializeMessageAnimation = (index) => {
@@ -149,58 +124,141 @@ const ChatBotScreen = ({ navigation }) => {
         ]).start();
     }, []);
 
-    // Mock bot responses
-    const getBotResponse = (userMessage) => {
-        const lowerMessage = userMessage.toLowerCase();
+    // Create or get active session
+    const initializeSession = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Сначала пытаемся получить все сессии
+            const sessionsResponse = await apiFetch("/api/v1/chat/sessions");
 
-        if (lowerMessage.includes('budget')) {
-            return {
-                text: "Your current monthly budget is $2,500. You've used 68% of it this month. Would you like me to show you a detailed breakdown?",
-                type: 'budget_info',
-                data: { used: 68, remaining: 32, amount: 2500 }
-            };
-        } else if (lowerMessage.includes('expense')) {
-            return {
-                text: "I've analyzed your expenses. Your top spending categories are: Food (32%), Transportation (18%), and Entertainment (15%). Should I create a detailed report?",
-                type: 'expense_analysis'
-            };
-        } else if (lowerMessage.includes('saving')) {
-            return {
-                text: "Here are some personalized savings tips:\n• Try the 50/30/20 rule\n• Reduce dining out by 2 times per week\n• Consider switching to a high-yield savings account\n\nWould you like more details on any of these?",
-                type: 'savings_tips'
-            };
-        } else if (lowerMessage.includes('help')) {
-            return {
-                text: "I can help you with:\n• Budget tracking and analysis\n• Expense categorization\n• Financial goal planning\n• Savings recommendations\n• Transaction insights\n\nWhat would you like to explore?",
-                type: 'help_menu'
-            };
-        } else {
-            return {
-                text: "I understand you're asking about your finances. Could you be more specific? For example, you can ask about your budget, expenses, savings, or get general help.",
-                type: 'clarification'
-            };
+            if (sessionsResponse.ok) {
+                const sessions = await sessionsResponse.json();
+                console.log("📋 Available sessions:", sessions);
+
+                // Ищем активную сессию
+                const activeSession = sessions.find(session => session.is_active);
+
+                if (activeSession) {
+                    console.log("✅ Found active session:", activeSession.id);
+                    await loadSession(activeSession.id);
+                } else {
+                    console.log("🆕 No active session found, creating new one");
+                    await createNewSession();
+                }
+            } else {
+                console.log("❌ Failed to get sessions, creating new one");
+                await createNewSession();
+            }
+        } catch (error) {
+            console.error("❌ Error initializing session:", error);
+            await createNewSession();
+        } finally {
+            setLoading(false);
         }
-    };
+    }, []);
+
+    // Create new session
+    const createNewSession = useCallback(async () => {
+        try {
+            const response = await apiFetch("/api/v1/chat/sessions", {
+                method: "POST",
+                body: JSON.stringify({
+                    title: "New Chat"
+                }),
+            });
+
+            if (response.ok) {
+                const session = await response.json();
+                console.log("✅ Created new session:", session);
+                setCurrentSession(session);
+                setMessages([]);
+
+                // Загружаем предложения для новой сессии
+                await loadSuggestions(session.id);
+                setShowSuggestions(true);
+            } else {
+                throw new Error("Failed to create session");
+            }
+        } catch (error) {
+            console.error("❌ Error creating session:", error);
+            Alert.alert(t('common.error'), t('chatbot.failed_to_create_session') || "Failed to create chat session");
+        }
+    }, [t]);
+
+    // Load existing session
+    const loadSession = useCallback(async (sessionId) => {
+        try {
+            const response = await apiFetch(`/api/v1/chat/sessions/${sessionId}`);
+
+            if (response.ok) {
+                const sessionData = await response.json();
+                console.log("✅ Loaded session:", sessionData);
+
+                setCurrentSession(sessionData);
+                setMessages(sessionData.messages || []);
+
+                // Если есть сообщения, скрываем предложения
+                if (sessionData.messages && sessionData.messages.length > 0) {
+                    setShowSuggestions(false);
+                } else {
+                    await loadSuggestions(sessionId);
+                    setShowSuggestions(true);
+                }
+            } else {
+                throw new Error("Failed to load session");
+            }
+        } catch (error) {
+            console.error("❌ Error loading session:", error);
+            await createNewSession();
+        }
+    }, [createNewSession]);
+
+    // Load suggestions
+    const loadSuggestions = useCallback(async (sessionId) => {
+        if (!sessionId) return;
+
+        setLoadingSuggestions(true);
+        try {
+            const response = await apiFetch(`/api/v1/chat/sessions/${sessionId}/suggestions`);
+
+            if (response.ok) {
+                const suggestionsData = await response.json();
+                console.log("💡 Loaded suggestions:", suggestionsData);
+                setSuggestions(suggestionsData || []);
+            } else {
+                console.warn("⚠️ Failed to load suggestions");
+                setSuggestions([]);
+            }
+        } catch (error) {
+            console.error("❌ Error loading suggestions:", error);
+            setSuggestions([]);
+        } finally {
+            setLoadingSuggestions(false);
+        }
+    }, []);
 
     // Send message
-    const sendMessage = useCallback(async (text = inputText, isQuickReply = false) => {
-        if (!text.trim()) return;
+    const sendMessage = useCallback(async (text = inputText, isSuggestion = false) => {
+        if (!text.trim() || !currentSession || sending) return;
 
+        const messageContent = text.trim();
+        console.log("📤 Sending message:", messageContent);
+
+        // Добавляем пользовательское сообщение локально для UI
         const userMessage = {
-            id: Date.now().toString(),
-            text: text.trim(),
-            isBot: false,
-            timestamp: new Date(),
-            type: 'text'
+            id: Date.now(),
+            role: "user",
+            content: messageContent,
+            created_at: new Date().toISOString(),
         };
 
-        // Add user message
         setMessages(prev => [...prev, userMessage]);
         setInputText("");
+        setSending(true);
 
-        if (isQuickReply) {
-            setShowQuickReplies(false);
-            Animated.timing(quickRepliesAnim, {
+        if (isSuggestion) {
+            setShowSuggestions(false);
+            Animated.timing(suggestionsAnim, {
                 toValue: 0,
                 duration: 300,
                 useNativeDriver: true,
@@ -214,44 +272,62 @@ const ChatBotScreen = ({ navigation }) => {
         setIsTyping(true);
         startTypingAnimation();
 
-        // Simulate bot thinking time
-        setTimeout(() => {
-            const botResponse = getBotResponse(text);
-            const botMessage = {
-                id: (Date.now() + 1).toString(),
-                text: botResponse.text,
-                isBot: true,
-                timestamp: new Date(),
-                type: botResponse.type,
-                data: botResponse.data
+        try {
+            const response = await apiFetch(`/api/v1/chat/sessions/${currentSession.id}/messages`, {
+                method: "POST",
+                body: JSON.stringify({
+                    content: messageContent
+                }),
+            });
+
+            if (response.ok) {
+                const botMessage = await response.json();
+                console.log("✅ Received bot response:", botMessage);
+
+                // Добавляем ответ бота
+                setMessages(prev => [...prev, botMessage]);
+            } else {
+                throw new Error("Failed to send message");
+            }
+        } catch (error) {
+            console.error("❌ Error sending message:", error);
+
+            // Добавляем сообщение об ошибке
+            const errorMessage = {
+                id: Date.now() + 1,
+                role: "assistant",
+                content: t('chatbot.error_message') || "Sorry, I'm having trouble responding right now. Please try again.",
+                created_at: new Date().toISOString(),
             };
 
+            setMessages(prev => [...prev, errorMessage]);
+
+            Alert.alert(t('common.error'), t('chatbot.failed_to_send') || "Failed to send message. Please try again.");
+        } finally {
             setIsTyping(false);
             stopTypingAnimation();
-            setMessages(prev => [...prev, botMessage]);
-        }, 1500 + Math.random() * 1000); // Random delay for realism
+            setSending(false);
+        }
+    }, [inputText, currentSession, sending, animateInput, startTypingAnimation, stopTypingAnimation, t]);
 
-    }, [inputText, animateInput, startTypingAnimation, stopTypingAnimation]);
-
-    // Handle quick reply
-    const handleQuickReply = useCallback((reply) => {
-        sendMessage(reply.text, true);
+    // Handle suggestion tap
+    const handleSuggestionTap = useCallback((suggestion) => {
+        sendMessage(suggestion, true);
     }, [sendMessage]);
 
-    // Clear chat
+    // Clear chat (create new session)
     const clearChat = useCallback(() => {
         Alert.alert(
-            t('chatbot.clear_chat') || "Clear Chat",
-            t('chatbot.clear_chat_confirm') || "Are you sure you want to clear the chat history?",
+            t('chatbot.new_chat') || "New Chat",
+            t('chatbot.new_chat_confirm') || "Start a new chat session? Current conversation will be saved.",
             [
                 { text: t('common.cancel'), style: "cancel" },
                 {
-                    text: "Clear",
-                    style: "destructive",
-                    onPress: () => {
-                        setMessages([]);
-                        setShowQuickReplies(true);
-                        Animated.timing(quickRepliesAnim, {
+                    text: t('chatbot.new_chat') || "New Chat",
+                    onPress: async () => {
+                        await createNewSession();
+                        setShowSuggestions(true);
+                        Animated.timing(suggestionsAnim, {
                             toValue: 1,
                             duration: 300,
                             useNativeDriver: true,
@@ -260,7 +336,7 @@ const ChatBotScreen = ({ navigation }) => {
                 }
             ]
         );
-    }, [t]);
+    }, [t, createNewSession]);
 
     // Scroll to bottom
     const scrollToBottom = useCallback(() => {
@@ -269,7 +345,16 @@ const ChatBotScreen = ({ navigation }) => {
         }, 100);
     }, []);
 
-    // Initialize
+    // Refresh chat
+    const onRefresh = useCallback(async () => {
+        if (!currentSession) return;
+
+        setRefreshing(true);
+        await loadSession(currentSession.id);
+        setRefreshing(false);
+    }, [currentSession, loadSession]);
+
+    // Initialize on mount
     useEffect(() => {
         // Welcome animation
         Animated.parallel([
@@ -286,11 +371,9 @@ const ChatBotScreen = ({ navigation }) => {
             }),
         ]).start();
 
-        // Add welcome message
-        setTimeout(() => {
-            setMessages([welcomeMessage]);
-        }, 800);
-    }, []);
+        // Initialize session
+        initializeSession();
+    }, [initializeSession]);
 
     // Auto scroll when new messages arrive
     useEffect(() => {
@@ -304,12 +387,13 @@ const ChatBotScreen = ({ navigation }) => {
     // Message bubble component
     const MessageBubble = ({ message, index }) => {
         const anim = initializeMessageAnimation(index);
+        const isBot = message.role === "assistant";
 
         return (
             <Animated.View
                 style={[
                     styles.messageContainer,
-                    message.isBot ? styles.botMessageContainer : styles.userMessageContainer,
+                    isBot ? styles.botMessageContainer : styles.userMessageContainer,
                     {
                         transform: [
                             {
@@ -329,7 +413,7 @@ const ChatBotScreen = ({ navigation }) => {
                     },
                 ]}
             >
-                {message.isBot && (
+                {isBot && (
                     <View style={styles.botAvatar}>
                         <LinearGradient
                             colors={["#2563EB", "#3B82F6"]}
@@ -342,38 +426,20 @@ const ChatBotScreen = ({ navigation }) => {
 
                 <View style={[
                     styles.messageBubble,
-                    message.isBot ? styles.botBubble : styles.userBubble
+                    isBot ? styles.botBubble : styles.userBubble
                 ]}>
                     <Text style={[
                         styles.messageText,
-                        message.isBot ? styles.botMessageText : styles.userMessageText
+                        isBot ? styles.botMessageText : styles.userMessageText
                     ]}>
-                        {message.text}
+                        {message.content}
                     </Text>
-
-                    {message.type === 'budget_info' && message.data && (
-                        <View style={styles.budgetInfoCard}>
-                            <View style={styles.budgetProgressContainer}>
-                                <View style={styles.budgetProgressBg}>
-                                    <View
-                                        style={[
-                                            styles.budgetProgressFill,
-                                            { width: `${message.data.used}%` }
-                                        ]}
-                                    />
-                                </View>
-                            </View>
-                            <Text style={styles.budgetInfoText}>
-                                ${(message.data.amount * message.data.used / 100).toFixed(0)} used of ${message.data.amount}
-                            </Text>
-                        </View>
-                    )}
 
                     <Text style={[
                         styles.timestamp,
-                        message.isBot ? styles.botTimestamp : styles.userTimestamp
+                        isBot ? styles.botTimestamp : styles.userTimestamp
                     ]}>
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                 </View>
             </Animated.View>
@@ -425,16 +491,16 @@ const ChatBotScreen = ({ navigation }) => {
         </Animated.View>
     );
 
-    // Quick replies component
-    const QuickReplies = () => (
+    // Suggestions component
+    const SuggestionsComponent = () => (
         <Animated.View
             style={[
-                styles.quickRepliesContainer,
+                styles.suggestionsContainer,
                 {
-                    opacity: quickRepliesAnim,
+                    opacity: suggestionsAnim,
                     transform: [
                         {
-                            translateY: quickRepliesAnim.interpolate({
+                            translateY: suggestionsAnim.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: [20, 0],
                             }),
@@ -443,24 +509,47 @@ const ChatBotScreen = ({ navigation }) => {
                 },
             ]}
         >
-            <Text style={styles.quickRepliesTitle}>
-                {t('chatbot.quick_questions') || "Quick questions:"}
+            <Text style={styles.suggestionsTitle}>
+                {t('chatbot.suggested_questions') || "Here are some things you can ask me:"}
             </Text>
-            <View style={styles.quickRepliesGrid}>
-                {quickReplies.map((reply, index) => (
-                    <TouchableOpacity
-                        key={reply.id}
-                        style={styles.quickReplyButton}
-                        onPress={() => handleQuickReply(reply)}
-                        activeOpacity={0.7}
-                    >
-                        <Ionicons name={reply.icon} size={18} color="#2563EB" />
-                        <Text style={styles.quickReplyText}>{reply.text}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
+
+            {loadingSuggestions ? (
+                <View style={styles.suggestionsLoading}>
+                    <ActivityIndicator size="small" color="#2563EB" />
+                    <Text style={styles.suggestionsLoadingText}>
+                        {t('chatbot.loading_suggestions') || "Loading suggestions..."}
+                    </Text>
+                </View>
+            ) : (
+                <View style={styles.suggestionsGrid}>
+                    {suggestions.map((suggestion, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={styles.suggestionButton}
+                            onPress={() => handleSuggestionTap(suggestion)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.suggestionText}>{suggestion}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            )}
         </Animated.View>
     );
+
+    // Loading screen
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#2563EB" />
+                    <Text style={styles.loadingText}>
+                        {t('chatbot.initializing') || "Initializing chat..."}
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -512,7 +601,7 @@ const ChatBotScreen = ({ navigation }) => {
                         onPress={clearChat}
                         activeOpacity={0.7}
                     >
-                        <Ionicons name="trash-outline" size={20} color={isDark ? "#F9FAFB" : "#111827"} />
+                        <Ionicons name="add-outline" size={20} color={isDark ? "#F9FAFB" : "#111827"} />
                     </TouchableOpacity>
                 </Animated.View>
 
@@ -524,14 +613,43 @@ const ChatBotScreen = ({ navigation }) => {
                         contentContainerStyle={styles.messagesContent}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor={isDark ? "#FFFFFF" : "#000000"}
+                            />
+                        }
                     >
+                        {/* Welcome Message */}
+                        {messages.length === 0 && !loading && (
+                            <View style={styles.welcomeContainer}>
+                                <LinearGradient
+                                    colors={["#2563EB", "#3B82F6"]}
+                                    style={styles.welcomeIcon}
+                                >
+                                    <MaterialCommunityIcons name="robot" size={32} color="#FFFFFF" />
+                                </LinearGradient>
+                                <Text style={styles.welcomeTitle}>
+                                    {t('chatbot.welcome_title') || "Welcome to your Financial Assistant!"}
+                                </Text>
+                                <Text style={styles.welcomeSubtitle}>
+                                    {t('chatbot.welcome_subtitle') || "I can help you with budgets, expenses, financial advice, and more. How can I assist you today?"}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Messages */}
                         {messages.map((message, index) => (
                             <MessageBubble key={message.id} message={message} index={index} />
                         ))}
 
                         <TypingIndicator />
 
-                        {showQuickReplies && messages.length === 1 && <QuickReplies />}
+                        {/* Suggestions */}
+                        {showSuggestions && suggestions.length > 0 && messages.length === 0 && (
+                            <SuggestionsComponent />
+                        )}
 
                         <View style={styles.messagesBottom} />
                     </ScrollView>
@@ -561,12 +679,13 @@ const ChatBotScreen = ({ navigation }) => {
                             style={styles.textInput}
                             value={inputText}
                             onChangeText={setInputText}
-                            placeholder={t('chatbot.type_message') || "Type your message..."}
+                            placeholder={t('chatbot.type_message') || "Ask me about your finances..."}
                             placeholderTextColor={isDark ? "#9CA3AF" : "#6B7280"}
                             multiline
-                            maxLength={500}
+                            maxLength={1000}
                             onSubmitEditing={() => sendMessage()}
                             returnKeyType="send"
+                            editable={!sending}
                         />
 
                         <TouchableOpacity
@@ -576,13 +695,13 @@ const ChatBotScreen = ({ navigation }) => {
                             ]}
                             onPress={() => sendMessage()}
                             activeOpacity={0.7}
-                            disabled={!inputText.trim() || isTyping}
+                            disabled={!inputText.trim() || sending || isTyping}
                         >
                             <LinearGradient
-                                colors={inputText.trim() ? ["#2563EB", "#3B82F6"] : [isDark ? "#374151" : "#E5E7EB", isDark ? "#374151" : "#E5E7EB"]}
+                                colors={inputText.trim() && !sending ? ["#2563EB", "#3B82F6"] : [isDark ? "#374151" : "#E5E7EB", isDark ? "#374151" : "#E5E7EB"]}
                                 style={styles.sendButtonGradient}
                             >
-                                {isLoading ? (
+                                {sending ? (
                                     <ActivityIndicator size="small" color="#FFFFFF" />
                                 ) : (
                                     <Ionicons
@@ -596,7 +715,7 @@ const ChatBotScreen = ({ navigation }) => {
                     </View>
 
                     <Text style={styles.inputHint}>
-                        {t('chatbot.input_hint') || "Ask about budgets, expenses, savings, or get help"}
+                        {t('chatbot.input_hint') || "Ask about budgets, expenses, savings, or get financial advice"}
                     </Text>
                 </Animated.View>
             </KeyboardAvoidingView>
@@ -609,6 +728,18 @@ const getThemedStyles = (isDark) =>
         container: {
             flex: 1,
             backgroundColor: isDark ? "#0F172A" : "#F8FAFC",
+        },
+        loadingContainer: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 20,
+        },
+        loadingText: {
+            marginTop: 16,
+            fontSize: 16,
+            color: isDark ? "#F9FAFB" : "#111827",
+            textAlign: "center",
         },
         header: {
             flexDirection: "row",
@@ -676,6 +807,32 @@ const getThemedStyles = (isDark) =>
         },
         messagesBottom: {
             height: 20,
+        },
+        welcomeContainer: {
+            alignItems: "center",
+            paddingVertical: 40,
+            paddingHorizontal: 20,
+        },
+        welcomeIcon: {
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: 16,
+        },
+        welcomeTitle: {
+            fontSize: 20,
+            fontWeight: "600",
+            color: isDark ? "#F9FAFB" : "#111827",
+            textAlign: "center",
+            marginBottom: 8,
+        },
+        welcomeSubtitle: {
+            fontSize: 14,
+            color: isDark ? "#9CA3AF" : "#6B7280",
+            textAlign: "center",
+            lineHeight: 20,
         },
         messageContainer: {
             flexDirection: "row",
@@ -753,46 +910,32 @@ const getThemedStyles = (isDark) =>
             borderRadius: 4,
             backgroundColor: isDark ? "#9CA3AF" : "#6B7280",
         },
-        budgetInfoCard: {
-            marginTop: 12,
-            paddingTop: 12,
-            borderTopWidth: 1,
-            borderTopColor: isDark ? "#374151" : "#E5E7EB",
-        },
-        budgetProgressContainer: {
-            marginBottom: 8,
-        },
-        budgetProgressBg: {
-            height: 6,
-            backgroundColor: isDark ? "#374151" : "#E5E7EB",
-            borderRadius: 3,
-            overflow: "hidden",
-        },
-        budgetProgressFill: {
-            height: "100%",
-            backgroundColor: "#2563EB",
-            borderRadius: 3,
-        },
-        budgetInfoText: {
-            fontSize: 12,
-            color: isDark ? "#9CA3AF" : "#6B7280",
-        },
-        quickRepliesContainer: {
+        suggestionsContainer: {
             marginTop: 20,
             marginBottom: 10,
         },
-        quickRepliesTitle: {
+        suggestionsTitle: {
             fontSize: 14,
             fontWeight: "500",
             color: isDark ? "#9CA3AF" : "#6B7280",
             marginBottom: 12,
+            textAlign: "center",
         },
-        quickRepliesGrid: {
-            gap: 8,
-        },
-        quickReplyButton: {
+        suggestionsLoading: {
             flexDirection: "row",
             alignItems: "center",
+            justifyContent: "center",
+            paddingVertical: 20,
+            gap: 8,
+        },
+        suggestionsLoadingText: {
+            fontSize: 14,
+            color: isDark ? "#9CA3AF" : "#6B7280",
+        },
+        suggestionsGrid: {
+            gap: 8,
+        },
+        suggestionButton: {
             backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
             paddingHorizontal: 16,
             paddingVertical: 12,
@@ -806,11 +949,11 @@ const getThemedStyles = (isDark) =>
             shadowRadius: 2,
             elevation: 1,
         },
-        quickReplyText: {
+        suggestionText: {
             fontSize: 14,
             color: isDark ? "#F9FAFB" : "#111827",
-            marginLeft: 10,
             fontWeight: "500",
+            textAlign: "center",
         },
         inputContainer: {
             backgroundColor: isDark ? "#1F2937" : "#FFFFFF",

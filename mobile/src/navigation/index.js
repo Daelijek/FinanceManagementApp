@@ -1,6 +1,6 @@
-// RootNavigation.js
+// src/navigation/index.js - ИСПРАВЛЕННАЯ ВЕРСИЯ С ПРАВИЛЬНЫМ ПОТОКОМ
 
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { TouchableOpacity, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -11,8 +11,11 @@ import {
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ThemeContext } from "../context/ThemeContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Screens
+import SplashScreen from "../screens/SplashScreen";
+import OnboardingScreen from "../screens/OnboardingScreen";
 import Registration from "../screens/Registration";
 import LoginScreen from "../screens/LoginScreen";
 import TransactionAdd from "../screens/TransactionAdd";
@@ -35,8 +38,12 @@ import ChatBotScreen from "../screens/ChatBotScreen";
 
 const Stack = createNativeStackNavigator();
 
-const AppNavigator = () => {
+// Компонент для управления логикой навигации
+const NavigationController = () => {
   const { theme } = useContext(ThemeContext);
+  const [initialRoute, setInitialRoute] = useState(null);
+  const [isReady, setIsReady] = useState(false);
+
   const isDark = theme === "dark";
 
   const headerBackground = isDark ? "#1F2937" : "#FFFFFF";
@@ -57,14 +64,50 @@ const AppNavigator = () => {
     headerTintColor: headerTextColor,
   };
 
-  // Универсальная функция для рендеринга «назад» с учётом вложенного таба
+  // Определяем начальный маршрут - ДЛЯ РАЗРАБОТКИ
+  useEffect(() => {
+    const determineInitialRoute = async () => {
+      try {
+        console.log("🚀 DEVELOPMENT MODE: Always starting with Onboarding");
+        
+        // Показываем splash минимум 2 секунды для плавности
+        const startTime = Date.now();
+        
+        // ДЛЯ РАЗРАБОТКИ: ВСЕГДА НАЧИНАЕМ С ONBOARDING
+        const targetRoute = "Onboarding";
+        
+        // Убеждаемся, что splash показывается минимум 2 секунды
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = Math.max(0, 2000 - elapsedTime);
+        
+        if (remainingTime > 0) {
+          console.log(`⏱️ Waiting additional ${remainingTime}ms for smooth transition`);
+          await new Promise(resolve => setTimeout(resolve, remainingTime));
+        }
+        
+        console.log(`🎯 Setting initial route: ${targetRoute}`);
+        setInitialRoute(targetRoute);
+        setIsReady(true);
+        
+      } catch (error) {
+        console.error("❌ Error determining initial route:", error);
+        // В случае ошибки всегда показываем onboarding
+        setInitialRoute("Onboarding");
+        setIsReady(true);
+      }
+    };
+
+    determineInitialRoute();
+  }, []);
+
+  // Универсальная функция для кнопки "Назад"
   const makeBackOptions = ({ navigation }) => {
     const state = navigation.getState();
     const { routes, index } = state;
     const prevRoute = routes[index - 1] || {};
-    // сначала берём имя родительского маршрута
     let previousRouteName = prevRoute.name ?? "Назад";
-    // если у него есть вложенный навигатор — вытаскиваем активный таб
+    
+    // Если есть вложенный навигатор, берем активный таб
     if (prevRoute.state) {
       const nestedIndex = prevRoute.state.index;
       const nestedRoute = prevRoute.state.routes[nestedIndex];
@@ -88,107 +131,152 @@ const AppNavigator = () => {
     };
   };
 
+  // Показываем Splash пока определяем начальный маршрут
+  if (!isReady) {
+    return <SplashScreen />;
+  }
+
   return (
-    <Stack.Navigator initialRouteName="Login" screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <Stack.Screen name="PasswordResetConfirm" component={PasswordResetConfirmScreen} />
-      <Stack.Screen name="Registration" component={Registration} />
+    <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
+      <Stack.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Системные экраны */}
+        <Stack.Screen 
+          name="Splash" 
+          component={SplashScreen}
+          options={{ headerShown: false }}
+        />
+        
+        <Stack.Screen 
+          name="Onboarding" 
+          component={OnboardingScreen}
+          options={{ headerShown: false }}
+        />
 
-      {/* Назовём стековый экран «MainPage», чтобы не дублировать имена */}
-      <Stack.Screen name="MainPage" component={BottomTabNavigator} />
+        {/* Аутентификация */}
+        <Stack.Screen 
+          name="Login" 
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        
+        <Stack.Screen 
+          name="ForgotPassword" 
+          component={ForgotPasswordScreen}
+          options={{ headerShown: false }}
+        />
+        
+        <Stack.Screen 
+          name="PasswordResetConfirm" 
+          component={PasswordResetConfirmScreen}
+          options={{ headerShown: false }}
+        />
+        
+        <Stack.Screen 
+          name="Registration" 
+          component={Registration}
+          options={{ headerShown: false }}
+        />
 
-      <Stack.Screen
-        name="Transaction Add"
-        component={TransactionAdd}
-        options={makeBackOptions}
-      />
+        {/* Основное приложение */}
+        <Stack.Screen 
+          name="MainPage" 
+          component={BottomTabNavigator}
+          options={{ headerShown: false }}
+        />
 
-      <Stack.Screen
-        name="Notifications"
-        component={NotificationsScreen}
-        options={makeBackOptions}
-      />
+        {/* Экраны с кастомными заголовками */}
+        <Stack.Screen
+          name="Transaction Add"
+          component={TransactionAdd}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Transfer"
-        component={TransferScreen}
-        options={defaultHeaderOptions}
-      />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Privacy Policy"
-        component={PrivacyPolicy}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Transfer"
+          component={TransferScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="App Settings"
-        component={AppSettings}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Privacy Policy"
+          component={PrivacyPolicy}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="All Transactions"
-        component={AllTransactionsScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="App Settings"
+          component={AppSettings}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Personal Information"
-        component={PersonalInformationScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="All Transactions"
+          component={AllTransactionsScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Budget Categories"
-        component={BudgetCategoriesScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Personal Information"
+          component={PersonalInformationScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Language"
-        component={LanguageScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Budget Categories"
+          component={BudgetCategoriesScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Set Budget"
-        component={SetBudgetScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Language"
+          component={LanguageScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Budget Analytics"
-        component={AnalyticsScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Set Budget"
+          component={SetBudgetScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="All Budgets"
-        component={AllBudgetsScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="Budget Analytics"
+          component={AnalyticsScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Export Report"
-        component={ExportReportScreen}
-        options={makeBackOptions}
-      />
+        <Stack.Screen
+          name="All Budgets"
+          component={AllBudgetsScreen}
+          options={makeBackOptions}
+        />
 
-      <Stack.Screen
-        name="Chat Bot"
-        component={ChatBotScreen}
-      />
-    </Stack.Navigator>
+        <Stack.Screen
+          name="Export Report"
+          component={ExportReportScreen}
+          options={makeBackOptions}
+        />
+
+        <Stack.Screen
+          name="Chat Bot"
+          component={ChatBotScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 };
 
+// Главный компонент навигации
 export default function RootNavigation() {
-  const { theme } = useContext(ThemeContext);
-  return (
-    <NavigationContainer theme={theme === "dark" ? DarkTheme : DefaultTheme}>
-      <AppNavigator />
-    </NavigationContainer>
-  );
+  return <NavigationController />;
 }
