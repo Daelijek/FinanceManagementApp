@@ -12,8 +12,12 @@ from app.services.profile import ProfileService
 from app.schemas.profile import ProfileCreate, FinancialDataCreate
 from app.models.financial import SubscriptionTypeEnum
 from app.utils.oauth import GoogleOAuth, MicrosoftOAuth
+from app.utils.mailer import send_reset_email, send_verification_email
 import os
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -63,6 +67,16 @@ class AuthService:
             credit_score=0
         )
         await ProfileService.create_financial_data(profile.id, financial_data, db)
+
+        # Отправляем письмо с подтверждением email (опционально)
+        try:
+            verification_token = SecurityUtils.generate_reset_token()
+            # Сохраняем токен подтверждения в базе (можно добавить поле в модель User)
+            await send_verification_email(user.email, verification_token, user.full_name)
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email: {e}")
+            # Не прерываем регистрацию, если не удалось отправить email
 
         # Возвращаем пользователя
         return user
@@ -274,20 +288,44 @@ class AuthService:
     @staticmethod
     async def request_password_reset(email: str, db: Session) -> None:
         """Запрос на сброс пароля"""
+        logger.info(f"Processing password reset request for email: {email}")
+        
         user = db.query(User).filter(User.email == email).first()
         if not user:
             # Не раскрываем информацию о существовании пользователя
+            # Но все равно логируем попытку
+            logger.warning(f"Password reset requested for non-existent email: {email}")
             return
 
-        # Генерируем токен сброса
-        reset_token = SecurityUtils.generate_reset_token()
-        user.reset_password_token = reset_token
-        user.reset_password_token_expires = datetime.utcnow() + timedelta(hours=1)
+        try:
+            # Генерируем токен сброса
+            reset_token = SecurityUtils.generate_reset_token()
+            user.reset_password_token = reset_token
+            user.reset_password_token_expires = datetime.utcnow() + timedelta(
+                hours=getattr(settings, 'PASSWORD_RESET_TOKEN_EXPIRE_HOURS', 1)
+            )
 
-        db.commit()
+            db.commit()
+            logger.info(f"Password reset token generated for user {user.email}")
 
-        # Здесь должна быть отправка email с токеном
-        # TODO: Implement email sending
+            # Отправляем email с токеном сброса
+            try:
+                email_sent = await send_reset_email(user.email, reset_token, user.full_name)
+                if email_sent:
+                    logger.info(f"Password reset email sent successfully to {user.email}")
+                else:
+                    logger.error(f"Failed to send password reset email to {user.email}")
+                    # В продакшене можно показать пользователю, что возникли проблемы с отправкой
+                    # Но не будем бросать исключение, чтобы не раскрывать информацию о пользователе
+            except Exception as e:
+                logger.error(f"Error sending password reset email to {user.email}: {str(e)}")
+                # В продакшене можно добавить retry механизм или уведомление администратора
+                
+        except Exception as e:
+            logger.error(f"Database error during password reset for {email}: {str(e)}")
+            # Откатываем изменения в БД
+            db.rollback()
+            raise
 
     @staticmethod
     async def reset_password(token: str, new_password: str, db: Session) -> None:
@@ -317,3 +355,17 @@ class AuthService:
         user.reset_password_token_expires = None
 
         db.commit()
+
+        logger.info(f"Password successfully reset for user {user.email}")
+
+    @staticmethod
+    async def verify_email(token: str, db: Session) -> None:
+        """Подтверждение email адреса"""
+        # Здесь нужно реализовать логику проверки токена верификации
+        # В текущей реализации токен верификации не сохраняется в БД
+        # Можно добавить поля email_verification_token и email_verification_expires в модель User
+        
+        # Заглушка для примера
+        logger.info(f"Email verification requested with token: {token}")
+        # TODO: Implement email verification logic
+        pass

@@ -53,6 +53,28 @@ async def verify_email(
     return {"message": "Email successfully verified"}
 
 
+@router.post("/resend-verification")
+async def resend_verification_email(
+        current_user: User = Depends(get_current_active_user),
+        db: Session = Depends(get_db)
+):
+    """Повторно отправить письмо для подтверждения email"""
+    if current_user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+
+    email_sent = await UserService.resend_verification_email(current_user.id, db)
+    if email_sent:
+        return {"message": "Verification email sent successfully"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email. Please try again later."
+        )
+
+
 @router.post("/change-password")
 async def change_password(
         current_password: str,
@@ -105,9 +127,34 @@ async def upload_profile_photo(
         db: Session = Depends(get_db)
 ):
     """Загрузить фото профиля"""
-    # Здесь нужно добавить логику сохранения фото
-    # Например, сохранение файла на диск или в облачное хранилище
-    # и сохранение ссылки на файл в профиле пользователя
+    # Проверяем тип файла
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be an image"
+        )
 
-    # Заглушка для примера
-    return {"message": "Photo uploaded successfully"}
+    # Проверяем размер файла (макс 5 МБ)
+    file_size = len(await file.read())
+    await file.seek(0)  # Возвращаем указатель в начало
+    
+    if file_size > 5 * 1024 * 1024:  # 5 МБ
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size must be less than 5 MB"
+        )
+
+    photo_url = await UserService.upload_profile_photo(current_user.id, file, db)
+    return {"message": "Photo uploaded successfully", "photo_url": photo_url}
+
+
+@router.get("/me/verification-status")
+async def get_verification_status(
+        current_user: User = Depends(get_current_active_user)
+):
+    """Получить статус верификации пользователя"""
+    return {
+        "email": current_user.email,
+        "is_verified": current_user.is_verified,
+        "verification_required": not current_user.is_verified
+    }

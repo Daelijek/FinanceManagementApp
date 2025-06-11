@@ -1,4 +1,4 @@
-# app/models/user.py (добавление поля для фото профиля)
+# app/models/user.py (обновленная версия с поддержкой email-верификации)
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, Date
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -19,7 +19,7 @@ class User(Base):
     profile_photo_url = Column(String, nullable=True)
 
     # OAuth поля
-    oauth_provider = Column(String, nullable=True)  # 'google', 'apple', None
+    oauth_provider = Column(String, nullable=True)  # 'google', 'microsoft', None
     oauth_id = Column(String, nullable=True)
 
     # Персональные данные
@@ -35,6 +35,10 @@ class User(Base):
     # Токен для сброса пароля
     reset_password_token = Column(String, nullable=True)
     reset_password_token_expires = Column(DateTime(timezone=True), nullable=True)
+
+    # Токен для верификации email
+    email_verification_token = Column(String, nullable=True)
+    email_verification_token_expires = Column(DateTime(timezone=True), nullable=True)
 
     # Связи с другими моделями
     profile = relationship("UserProfile", back_populates="user", uselist=False)

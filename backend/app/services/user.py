@@ -5,11 +5,14 @@ from fastapi import HTTPException, status, UploadFile
 from app.models.user import User
 from app.schemas.user import UserUpdate, UserPersonalInfo
 from app.utils.security import SecurityUtils
-from datetime import datetime
+from app.utils.mailer import send_verification_email
+from datetime import datetime, timedelta
 import os
 import uuid
 from app.config import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -112,10 +115,69 @@ class UserService:
         db.commit()
 
     @staticmethod
+    async def send_verification_email(user_id: int, db: Session) -> bool:
+        """Отправить письмо для подтверждения email"""
+        user = await UserService.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        if user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is already verified"
+            )
+
+        # Генерируем токен верификации
+        verification_token = SecurityUtils.generate_reset_token()
+        user.email_verification_token = verification_token
+        user.email_verification_token_expires = datetime.utcnow() + timedelta(hours=24)  # 24 часа
+
+        db.commit()
+
+        # Отправляем email
+        try:
+            email_sent = await send_verification_email(user.email, verification_token, user.full_name)
+            if email_sent:
+                logger.info(f"Verification email sent successfully to {user.email}")
+                return True
+            else:
+                logger.error(f"Failed to send verification email to {user.email}")
+                return False
+        except Exception as e:
+            logger.error(f"Error sending verification email to {user.email}: {str(e)}")
+            return False
+
+    @staticmethod
     async def verify_email(token: str, db: Session) -> None:
         """Подтвердить email пользователя"""
-        # Здесь должна быть логика проверки токена верификации
-        pass
+        user = db.query(User).filter(
+            User.email_verification_token == token,
+            User.email_verification_token_expires > datetime.utcnow()
+        ).first()
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired verification token"
+            )
+
+        if user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is already verified"
+            )
+
+        # Подтверждаем email
+        user.is_verified = True
+        user.email_verification_token = None
+        user.email_verification_token_expires = None
+
+        db.commit()
+
+        logger.info(f"Email successfully verified for user {user.email}")
 
     @staticmethod
     async def change_password(
@@ -132,12 +194,16 @@ class UserService:
                 detail="User not found"
             )
 
-        # Проверяем текущий пароль
-        if not SecurityUtils.verify_password(current_password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is incorrect"
-            )
+        # Проверяем текущий пароль (только для не-OAuth пользователей)
+        if user.hashed_password:
+            if not SecurityUtils.verify_password(current_password, user.hashed_password):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Current password is incorrect"
+                )
+        else:
+            # Если пользователь OAuth и у него нет пароля, не требуем текущий пароль
+            pass
 
         # Валидация нового пароля
         is_strong, message = SecurityUtils.password_strength_validator(new_password)
@@ -147,8 +213,8 @@ class UserService:
                 detail=message
             )
 
-        # Проверяем, что новый пароль отличается от текущего
-        if SecurityUtils.verify_password(new_password, user.hashed_password):
+        # Проверяем, что новый пароль отличается от текущего (если есть)
+        if user.hashed_password and SecurityUtils.verify_password(new_password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="New password must be different from current password"
@@ -157,3 +223,10 @@ class UserService:
         # Обновляем пароль
         user.hashed_password = SecurityUtils.get_password_hash(new_password)
         db.commit()
+
+        logger.info(f"Password successfully changed for user {user.email}")
+
+    @staticmethod
+    async def resend_verification_email(user_id: int, db: Session) -> bool:
+        """Повторно отправить письмо для подтверждения email"""
+        return await UserService.send_verification_email(user_id, db)

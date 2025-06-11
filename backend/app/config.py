@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    OPENAI_API_KEY: str
+    OPENAI_API_KEY: str = ""
 
     # База данных
     DATABASE_URL: str
@@ -28,10 +28,16 @@ class Settings(BaseSettings):
 
     # Email (для сброса пароля)
     SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = None
+    SMTP_PORT: Optional[int] = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
     EMAILS_FROM_EMAIL: Optional[str] = None
+    EMAILS_FROM_NAME: Optional[str] = None
+    
+    # Настройки токена сброса пароля
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
 
     # OAuth (Google)
     GOOGLE_CLIENT_ID: Optional[str] = None
@@ -44,9 +50,8 @@ class Settings(BaseSettings):
     MICROSOFT_REDIRECT_URI: Optional[str] = None
     MICROSOFT_TENANT: str = "common"  # common, organizations, consumers, <tenant_id>
 
-    # Настройки для загрузки файлов
-    UPLOAD_DIR: str = "uploads"
-    MAX_UPLOAD_SIZE: int = 10_485_760  # 10 МБ
+    # URL приложения (для ссылок в email)
+    FRONTEND_URL: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"
