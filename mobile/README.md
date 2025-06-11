@@ -44,6 +44,7 @@ npx expo start --lan
 Установка зависимости для отправки email
 
 pip install fastapi-mail
+pip install openai
 
 Для запуска бэкенда.
 python -m venv venv

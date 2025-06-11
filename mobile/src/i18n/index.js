@@ -143,7 +143,15 @@ const resources = {
                 support_help: "Support & Help",
                 help_center: "Help Center",
                 about_app: "About App",
-                version: "Version 2.4.1"
+                version: "Version 2.4.1",
+                free_member: "Free Member",
+                trial_member: "Trial Member",
+                no_subscription: "No Subscription",
+                logout: "Sign Out",
+                logout_title: "Sign Out",
+                logout_message: "Are you sure you want to sign out?",
+                logout_error: "An error occurred while signing out. Please try again.",
+                logging_out: "Signing out..."
             },
             settings: {
                 display_appearance: "Display & Appearance",
@@ -366,16 +374,47 @@ const resources = {
                 financial_assistant: "Financial Assistant",
                 online: "Online",
                 typing: "Typing...",
-                type_message: "Type your message...",
-                input_hint: "Ask about budgets, expenses, savings, or get help",
+                type_message: "Ask me about your finances...",
+                input_hint: "Ask about budgets, expenses, savings, or get financial advice",
                 quick_questions: "Quick questions:",
+                suggested_questions: "Here are some things you can ask me:",
                 check_budget: "Check my budget",
                 analyze_expenses: "Analyze my expenses",
                 savings_tips: "Savings tips",
                 help: "Help & Support",
                 ask_assistant: "Ask Assistant",
+                new_chat: "New Chat",
+                new_chat_confirm: "Start a new chat session? Current conversation will be saved.",
                 clear_chat: "Clear Chat",
-                clear_chat_confirm: "Are you sure you want to clear the chat history?"
+                clear_chat_confirm: "Are you sure you want to clear the chat history?",
+                initializing: "Initializing chat...",
+                failed_to_create_session: "Failed to create chat session",
+                failed_to_send: "Failed to send message. Please try again.",
+                error_message: "Sorry, I'm having trouble responding right now. Please try again.",
+                loading_suggestions: "Loading suggestions...",
+                welcome_title: "Welcome to your Financial Assistant!",
+                welcome_subtitle: "I can help you with budgets, expenses, financial advice, and more. How can I assist you today?",
+            },
+            onboarding: {
+                skip: "Skip",
+                next: "Next",
+                get_started: "Get Started",
+                slide1: {
+                    title: "Smart Financial Management",
+                    subtitle: "Take control of your finances with intelligent budgeting and expense tracking"
+                },
+                slide2: {
+                    title: "AI-Powered Insights",
+                    subtitle: "Get personalized financial advice and smart recommendations from our AI assistant"
+                },
+                slide3: {
+                    title: "Budget Goals & Tracking",
+                    subtitle: "Set budget goals, track your progress, and achieve your financial dreams"
+                },
+                slide4: {
+                    title: "Secure & Private",
+                    subtitle: "Your financial data is protected with bank-level security and encryption"
+                }
             },
         }
     },
@@ -519,7 +558,15 @@ const resources = {
                 support_help: "Поддержка и помощь",
                 help_center: "Центр помощи",
                 about_app: "О приложении",
-                version: "Версия 2.4.1"
+                version: "Версия 2.4.1",
+                free_member: "Бесплатный участник",
+                trial_member: "Пробный участник",
+                no_subscription: "Нет подписки",
+                logout: "Выйти из аккаунта",
+                logout_title: "Выход из аккаунта",
+                logout_message: "Вы уверены, что хотите выйти из аккаунта?",
+                logout_error: "Произошла ошибка при выходе из аккаунта. Попробуйте еще раз.",
+                logging_out: "Выход..."
             },
             settings: {
                 display_appearance: "Отображение и внешний вид",
@@ -742,16 +789,47 @@ const resources = {
                 financial_assistant: "Финансовый помощник",
                 online: "Онлайн",
                 typing: "Печатает...",
-                type_message: "Введите ваше сообщение...",
-                input_hint: "Спросите о бюджете, расходах, сбережениях или получите помощь",
+                type_message: "Спросите меня о ваших финансах...",
+                input_hint: "Спросите о бюджете, расходах, сбережениях или получите финансовые советы",
                 quick_questions: "Быстрые вопросы:",
+                suggested_questions: "Вот несколько вещей, о которых вы можете меня спросить:",
                 check_budget: "Проверить мой бюджет",
                 analyze_expenses: "Анализировать мои расходы",
                 savings_tips: "Советы по сбережениям",
                 help: "Помощь и поддержка",
                 ask_assistant: "Спросить помощника",
+                new_chat: "Новый чат",
+                new_chat_confirm: "Начать новую сессию чата? Текущий разговор будет сохранен.",
                 clear_chat: "Очистить чат",
-                clear_chat_confirm: "Вы уверены, что хотите очистить историю чата?"
+                clear_chat_confirm: "Вы уверены, что хотите очистить историю чата?",
+                initializing: "Инициализация чата...",
+                failed_to_create_session: "Не удалось создать сессию чата",
+                failed_to_send: "Не удалось отправить сообщение. Попробуйте еще раз.",
+                error_message: "Извините, у меня сейчас проблемы с ответом. Попробуйте еще раз.",
+                loading_suggestions: "Загрузка предложений...",
+                welcome_title: "Добро пожаловать к вашему Финансовому помощнику!",
+                welcome_subtitle: "Я могу помочь с бюджетами, расходами, финансовыми советами и многим другим. Как я могу вам помочь сегодня?",
+            },
+            onboarding: {
+                skip: "Пропустить",
+                next: "Далее",
+                get_started: "Начать",
+                slide1: {
+                    title: "Умное управление финансами",
+                    subtitle: "Возьмите под контроль свои финансы с интеллектуальным бюджетированием и отслеживанием расходов"
+                },
+                slide2: {
+                    title: "ИИ-помощник и аналитика",
+                    subtitle: "Получайте персонализированные финансовые советы и умные рекомендации от нашего ИИ-помощника"
+                },
+                slide3: {
+                    title: "Цели и отслеживание бюджета",
+                    subtitle: "Ставьте бюджетные цели, отслеживайте прогресс и достигайте финансовых мечт"
+                },
+                slide4: {
+                    title: "Безопасность и приватность",
+                    subtitle: "Ваши финансовые данные защищены банковским уровнем безопасности и шифрования"
+                }
             },
         }
     },
@@ -895,7 +973,15 @@ const resources = {
                 support_help: "Қолдау және көмек",
                 help_center: "Көмек орталығы",
                 about_app: "Қолданба туралы",
-                version: "Нұсқа 2.4.1"
+                version: "Нұсқа 2.4.1",
+                free_member: "Тегін мүше",
+                trial_member: "Сынақ мүшесі",
+                no_subscription: "Жазылу жоқ",
+                logout: "Аккаунттан шығу",
+                logout_title: "Аккаунттан шығу",
+                logout_message: "Аккаунттан шыққыңыз келетініне сенімдісіз бе?",
+                logout_error: "Аккаунттан шығу кезінде қате орын алды. Қайталап көріңіз.",
+                logging_out: "Шығу..."
             },
             settings: {
                 display_appearance: "Көрсету және сыртқы түр",
@@ -1118,16 +1204,47 @@ const resources = {
                 financial_assistant: "Қаржылық көмекші",
                 online: "Желіде",
                 typing: "Жазып жатыр...",
-                type_message: "Хабарламаңызды жазыңыз...",
-                input_hint: "Бюджет, шығын, жинақ немесе көмек туралы сұраңыз",
+                type_message: "Қаржыңыз туралы сұраңыз...",
+                input_hint: "Бюджет, шығын, жинақ немесе қаржылық кеңес туралы сұраңыз",
                 quick_questions: "Жылдам сұрақтар:",
+                suggested_questions: "Міне, маған сұрай алатын нәрселер:",
                 check_budget: "Бюджетімді тексеру",
                 analyze_expenses: "Шығындарымды талдау",
                 savings_tips: "Жинақ бойынша кеңестер",
                 help: "Көмек және қолдау",
                 ask_assistant: "Көмекшіден сұрау",
+                new_chat: "Жаңа чат",
+                new_chat_confirm: "Жаңа чат сессиясын бастау керек пе? Ағымдағы сөйлесу сақталады.",
                 clear_chat: "Чатты тазарту",
-                clear_chat_confirm: "Чат тарихын өшіргіңіз келетініне сенімдісіз бе?"
+                clear_chat_confirm: "Чат тарихын өшіргіңіз келетініне сенімдісіз бе?",
+                initializing: "Чат инициализациялануда...",
+                failed_to_create_session: "Чат сессиясын жасау мүмкін болмады",
+                failed_to_send: "Хабарламаны жіберу мүмкін болмады. Қайталаңыз.",
+                error_message: "Кешіріңіз, қазір жауап беруде қиындықтар бар. Қайталаңыз.",
+                loading_suggestions: "Ұсыныстар жүктелуде...",
+                welcome_title: "Қаржылық көмекшіңізге қош келдіңіз!",
+                welcome_subtitle: "Мен бюджеттер, шығыстар, қаржылық кеңестер және басқа көп нәрселерде көмектесе аламын. Бүгін қалай көмектесе аламын?",
+            },
+            onboarding: {
+                skip: "Өткізу",
+                next: "Алдыға",
+                get_started: "Бастау",
+                slide1: {
+                    title: "Ақылды қаржы басқаруы",
+                    subtitle: "Ақылды бюджеттеу және шығыстарды бақылау арқылы қаржыңызды бақылауға алыңыз"
+                },
+                slide2: {
+                    title: "ЖИ көмекшісі және талдау",
+                    subtitle: "Біздің ЖИ көмекшісінен жеке қаржылық кеңестер және ақылды ұсыныстар алыңыз"
+                },
+                slide3: {
+                    title: "Бюджет мақсаттары мен бақылау",
+                    subtitle: "Бюджет мақсаттарын қойыңыз, прогрессті қадағалаңыз және қаржылық арманыңызға жетіңіз"
+                },
+                slide4: {
+                    title: "Қауіпсіз және жеке",
+                    subtitle: "Сіздің қаржылық деректеріңіз банк деңгейіндегі қауіпсіздік пен шифрлаумен қорғалған"
+                }
             },
         }
     }
